@@ -21,11 +21,11 @@ it is.
 
 Some upstream rsync talk:
 
-https://lists.samba.org/archive/rsync/2009-March/022821.html
+* https://lists.samba.org/archive/rsync/2009-March/022821.html
 
-https://lists.samba.org/archive/rsync/2009-September/023909.html
+* https://lists.samba.org/archive/rsync/2009-September/023909.html
 
-https://bugzilla.samba.org/show_bug.cgi?id=3579
+* https://bugzilla.samba.org/show_bug.cgi?id=3579
 
 Solution constraints
 ====================
