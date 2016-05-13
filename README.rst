@@ -1,5 +1,3 @@
-Prepare for random brainstorming....
-
 The problem
 ===========
 
@@ -50,8 +48,9 @@ Solution constraints
 * We need to handle hard linking.  Fedora uses hardlinks all over the place.
   Hardlinks are difficult because:
 
-  * Newly linked file(name)s have the same mtimes as the original ones, so the
-    files appear to be new.  Thus a scan for new files won't find them.
+  * Newly linked file(name)s have exactly the same stat results as the original
+    ones, so the files appear to be new.  Thus a scan for new files won't find
+    them.
 
   * If you naively transfer a directory with hardlinked files you may pull down
     a complete copy of things you already have.
@@ -64,8 +63,8 @@ Proposed solution
 =================
 
 Pregenerate a file list on the server.  This list needs to include file and
-directory names, the modification time (seconds since epoch) and the inode on
-the server.
+directory names, the newer of the ctime and mtime (as seconds since epoch) and
+the inode on the server.
 
 Having directories enables the client to find new hardlinks by copying the
 contents of directories newer than the last sync.  The containing directory's
@@ -74,6 +73,29 @@ mtime is updated even though the hardlinked files within appear to be old.
 Having the inode lets the client determine files which may be hardlinked to
 files it already has.  If rsync is told to transfer all of them, it should make
 hardlinks as necesary without having to re-transfer things.  The server could
-save the client some time by pregenerating tuples of hardlinks so that files
-could be found with a grep.
+save the client some time by pregenerating tuples of hardlinks or a table
+suitable for pulling into an associative array.
 
+Client Algorithm
+================
+
+* Store current time in a variable.
+
+* Load the last mod time LASTTIME
+
+* Download file/time list and hardlink list.
+
+* Find all files and dirs with times newer than LASTTIME.
+
+* Pass to rsync via ``--files-from``.
+
+Server Portion
+==============
+
+* Recursively traverse the entire filesystem.
+
+* Stat every file and directory.
+
+* Find newer of mtime and ctime
+
+* Write out time\tfilename
