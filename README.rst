@@ -1,3 +1,5 @@
+Prepare for random brainstorming....
+
 The problem
 ===========
 
@@ -72,7 +74,6 @@ mtime is updated even though the hardlinked files within appear to be old.
 Having the inode lets the client determine files which may be hardlinked to
 files it already has.  If rsync is told to transfer all of them, it should make
 hardlinks as necesary without having to re-transfer things.  The server could
-save the client some time by pregenerating tuples of hardlinks.
-
-
+save the client some time by pregenerating tuples of hardlinks so that files
+could be found with a grep.
 
