@@ -13,7 +13,7 @@ db () {
 }
 
 # Default arguments; override in quick-fedora-mirror.conf
-TOPD=/srv/mirror/pub
+DESTD=/srv/mirror/pub
 REMOTE=rsync://dl.fedoraproject.org
 FILELIST=fullfiletimelist
 TRANSFERLIST=files-to-transfer
@@ -21,7 +21,7 @@ RSYNC=/usr/bin/rsync
 RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
 VERBOSE=4
 MODULES=(fedora-epel)
-TIMEFILE=$TOPD/last-fedora-mirror
+TIMEFILE=$DESTD/last-fedora-mirror
 
 # Load up the configuration file
 for i in /etc/quick-fedora-mirror.conf \
@@ -55,7 +55,7 @@ case $VERBOSE in
         echo TIMEFILE=$TIMEFILE
         echo Dirs:
         echo TEMPD=$TEMPD
-        echo TOPD=$TOPD
+        echo DESTD=$DESTD
         echo Rsync:
         echo REMOTE=$REMOTE
         echo RSYNC=$RSYNC
@@ -70,6 +70,8 @@ case $VERBOSE in
         ;;
 esac
 
+# We want to accumulate a big list of everything that needs to be transferred
+# from all of the modules
 for module in $MODULES; do
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them
@@ -85,8 +87,11 @@ for module in $MODULES; do
     # We probably want to sleep with backoff and retry, and pull the rsync call
     # out to a separate function to make that easier.
 
-
-
+    awk "{if (\$1 >= $LASTTIME) {print \"$module/\" \$3}}" < $FILELIST >> $TRANSFERLIST
 done
 
-
+# Now we have a list of everything which has changed recently in every module
+# we want, pass that to rsync (non recursive mode!) and it should transfer just
+# the changed files without having to pull the entire huge file list.
+db $RSYNC $RSYNCOPTS --from-file $TRANSFERLIST $REMOTE $DESTD
+$RSYNC $RSYNCOPTS --from-file $TRANSFERLIST $REMOTE $DESTD
