@@ -1,0 +1,92 @@
+#!/bin/zsh
+# Simple script to grab the file list from Fedora and rsync everything that's changed since the last time we pulled
+
+# Do this absolutely first
+STARTTIME=$(date +%s)
+# Paranoia
+STARTTIME=$(($STARTTIME-5))
+
+# Utility functions
+
+db () {
+    (( VERBOSE > 0 )) && echo $*
+}
+
+# Default arguments; override in quick-fedora-mirror.conf
+TOPD=/srv/mirror/pub
+REMOTE=rsync://dl.fedoraproject.org
+FILELIST=fullfiletimelist
+TRANSFERLIST=files-to-transfer
+RSYNC=/usr/bin/rsync
+RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
+VERBOSE=4
+MODULES=(fedora-epel)
+TIMEFILE=$TOPD/last-fedora-mirror
+
+# Load up the configuration file
+for i in /etc/quick-fedora-mirror.conf \
+        ~/.config/quick-fedora-mirror.conf \
+        $(dirname $0)/quick-fedora-mirror.conf \
+        ./quick-fedora-mirror.conf; do
+    if [[ -f $i ]]; then
+        source $i
+    fi
+done
+
+LASTTIME=0
+if [[ -r $TIMEFILE ]]; then
+    source $TIMEFILE
+fi
+
+TEMPD=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
+cd $TEMPD
+trap "rm -rf $TEMPD" EXIT
+
+
+# Modify RSYNCOPTS based on verbosity
+case $VERBOSE in
+    5)
+        set +x
+        ;&
+    4)
+        echo Times:
+        echo LASTTIME=$LASTTIME
+        echo STARTTIME=$STARTTIME
+        echo TIMEFILE=$TIMEFILE
+        echo Dirs:
+        echo TEMPD=$TEMPD
+        echo TOPD=$TOPD
+        echo Rsync:
+        echo REMOTE=$REMOTE
+        echo RSYNC=$RSYNC
+        echo RSYNCOPTS=$RSYNCOPTS
+        echo MODULES=$MODULES
+        ;&
+    3)  RSYNCOPTS+=(-v)
+        ;&
+    2)  RSYNCOPTS+=(-v)
+        ;;
+    0)  RSYNCOPTS+=(-q)
+        ;;
+esac
+
+for module in $MODULES; do
+    # First fetch each filefiletimelist, and make one big transfer list from
+    # all of them
+    echo Fetching file list for $i
+    rm -f fullfiletimelist
+
+    db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    db
+    db rsync returned $?
+
+    # Handle error returns.  5 is "too many connections"
+    # We probably want to sleep with backoff and retry, and pull the rsync call
+    # out to a separate function to make that easier.
+
+
+
+done
+
+
