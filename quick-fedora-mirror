@@ -12,16 +12,33 @@ db () {
     (( VERBOSE > 0 )) && echo $*
 }
 
+# Mapping from module names to directories under fedora-buffet
+typeset -A MODULEMAPPING
+MODULEMAPPING=(
+    fedora-buffet0  ''
+    fedora-buffet   ''
+    fedora-alt      alt
+    fedora-archive  archive
+    fedora-enchilada fedora
+    fedora-epel     epel
+    )
+
 # Default arguments; override in quick-fedora-mirror.conf
+VERBOSE=5
+
 DESTD=/srv/mirror/pub
+TIMEFILE=$DESTD/last-fedora-mirror
+TRANSFERLIST=files-to-transfer
+
 REMOTE=rsync://dl.fedoraproject.org
 FILELIST=fullfiletimelist
-TRANSFERLIST=files-to-transfer
+
 RSYNC=/usr/bin/rsync
 RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
-VERBOSE=4
+
+MASTERMODULE=fedora-buffet
+MIRRORBUFFET=0
 MODULES=(fedora-epel)
-TIMEFILE=$DESTD/last-fedora-mirror
 
 # Load up the configuration file
 for i in /etc/quick-fedora-mirror.conf \
@@ -45,8 +62,11 @@ trap "rm -rf $TEMPD" EXIT
 
 # Modify RSYNCOPTS based on verbosity
 case $VERBOSE in
-    5)
+    6)
         set +x
+        ;&
+    5)
+        RSYNCOPTS+=(--progress)
         ;&
     4)
         echo Times:
@@ -58,9 +78,12 @@ case $VERBOSE in
         echo DESTD=$DESTD
         echo Rsync:
         echo REMOTE=$REMOTE
+        echo MASTERMODULE=$REMOTE
         echo RSYNC=$RSYNC
         echo RSYNCOPTS=$RSYNCOPTS
+        echo Modules:
         echo MODULES=$MODULES
+        echo MODULEMAPPING=$MODULEMAPPING
         ;&
     3)  RSYNCOPTS+=(-v)
         ;&
@@ -70,28 +93,44 @@ case $VERBOSE in
         ;;
 esac
 
-# We want to accumulate a big list of everything that needs to be transferred
-# from all of the modules
-for module in $MODULES; do
-    # First fetch each filefiletimelist, and make one big transfer list from
-    # all of them
-    echo Fetching file list for $i
-    rm -f fullfiletimelist
+if [[ $MIRRORBUFFET -ne '0' ]]; then
+    # We only have to mirror the one big thing
 
-    db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    db
-    db rsync returned $?
 
-    # Handle error returns.  5 is "too many connections"
-    # We probably want to sleep with backoff and retry, and pull the rsync call
-    # out to a separate function to make that easier.
+else
+    # We have to accumulate a big list of everything that needs to be
+    # transferred from all of the modules
+    for module in $MODULES; do
+        # First fetch each filefiletimelist, and make one big transfer list from
+        # all of them
+        echo Fetching file list for $i
+        rm -f fullfiletimelist
 
-    awk "{if (\$1 >= $LASTTIME) {print \"$module/\" \$3}}" < $FILELIST >> $TRANSFERLIST
-done
+        db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+        $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+        db
+        db rsync returned $?
+
+        # Handle error returns.  5 is "too many connections"
+        # We probably want to sleep with backoff and retry, and pull the rsync call
+        # out to a separate function to make that easier.
+
+        awk "{if (\$1 >= $LASTTIME) {print \"$MODULEMAPPING[$module]/\"\$3}}" < $FILELIST >> $TRANSFERLIST
+
+        # We always want to transfer the file list itself in the transaction.
+        echo $MODULEMAPPING[$module]/$FILELIST >> $TRANSFERLIST
+    done
+fi
+
+db Sorting.
+sort $TRANSFERLIST > $TRANSFERLIST.sorted
+cp $TRANSFERLIST.sorted ~
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db $RSYNC $RSYNCOPTS --from-file $TRANSFERLIST $REMOTE $DESTD
-$RSYNC $RSYNCOPTS --from-file $TRANSFERLIST $REMOTE $DESTD
+db $RSYNC $RSYNCOPTS --files-from $TRANSFERLIST.sorted $REMOTE $DESTD
+$RSYNC $RSYNCOPTS --files-from $TRANSFERLIST.sorted $REMOTE/$MASTERMODULE/ $DESTD
+
+# Should only do this if everything above succeeded
+echo LASTTIME=$STARTTIME > $TIMEFILE
