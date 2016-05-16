@@ -15,20 +15,27 @@ starttime=$(($starttime-5))
 
 # Utility functions
 
-db () {
-    (( VERBOSE >= 2 )) && echo \>\> $*
+db () { (( VERBOSE >= 2 )) && echo \>\> $* }
+db2 () { (( VERBOSE >= 3 )) && echo \>\> $* }
+db3 () { (( VERBOSE >= 4 )) && echo \>\> $* }
+
+finish () {
+    if (( $VERBOSE >= 1 )); then
+        echo -n 'Mirror finished: '
+        date
+        exit 0
+    fi
 }
 
 # Mapping from module names to directories under fedora-buffet
 # ZSHISM (initialize associative array)
 typeset -A MODULEMAPPING
 MODULEMAPPING=(
-    fedora-buffet0  ''
-    fedora-buffet   ''
-    fedora-alt      alt
-    fedora-archive  archive
-    fedora-enchilada fedora
-    fedora-epel     epel
+    fedora-alt          alt
+    fedora-archive      archive
+    fedora-enchilada    fedora
+    fedora-epel         epel
+    fedora-secondary    fedora-secondary
     )
 
 # Default arguments; override in quick-fedora-mirror.conf
@@ -129,8 +136,14 @@ for module in $MODULES; do
     moduledir=$MODULEMAPPING[$module]
 
     # First fetch each filefiletimelist, and make one big transfer list from
-    # all of them
-    rm -f fullfiletimelist
+    # all of them  Copy in the old file from our repo to speed up rsync in case
+    # most of it didn't change
+    rm -f $FILELIST
+    if [[ -f $DESTD/$moduledir/$FILELIST ]]; then
+        cp -p $DESTD/$moduledir/$FILELIST .
+        filelisttime=$(stat --format=%Y $FILELIST)
+    fi
+
 
     db -- $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
     sleep=1
@@ -146,9 +159,10 @@ for module in $MODULES; do
         fi
     done
 
-    # Handle error returns.  5 is "too many connections"
-    # We probably want to sleep with backoff and retry, and pull the rsync call
-    # out to a separate function to make that easier.
+    if [[ $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
+        db No change in file list mtime: skipping $module
+        continue
+    fi
 
     # ZSHISM? (associative array indexing)
     db ++ Extracting lists
@@ -178,8 +192,9 @@ for module in $MODULES; do
         sort alldirs alldirs localdirs | uniq -u > dirs-to-delete
         db ++ Removing stale dirs
         for nuke in $(cat dirs-to-delete); do
-            if [[ -d $DESTD/$nuke ]]; then
-                rm -rf $DESTD/$nuke
+            if [[ -d "$DESTD/$nuke" ]]; then
+                db3 ++++ Removing $nuke
+                rm -rf "$DESTD/$nuke"
             fi
         done
 
@@ -190,8 +205,9 @@ for module in $MODULES; do
         sort allfiles allfiles localfiles | uniq -u > files-to-delete
         db ++ Removing stale files
         for nuke in $(cat files-to-delete); do
-            if [[ -f $nuke || -h $nuke ]]; then
-                rm -f $DESTD/$nuke
+            if [[ -f "$nuke" || -h "$nuke" ]]; then
+                db3 ++++ Removing $nuke
+                rm -f "$DESTD/$nuke"
             fi
         done
     fi
@@ -199,6 +215,10 @@ for module in $MODULES; do
 done
 
 # rsync docs suggest sorting the list for efficiency
+if [[ ! -e newfiles ]]; then
+    db No changed files.
+    finish
+fi
 db Beginning transfer
 sort newfiles > newfiles.sorted
 
@@ -219,6 +239,8 @@ while true; do
     fi
 done
 
+mv $TIMEFILE $TIMEFILE.prev
+
 db Saving mirror time to $TIMEFILE
 echo LASTTIME=$starttime > $TIMEFILE
 
@@ -227,7 +249,4 @@ if (( ? != 0 )); then
     exit 1
 fi
 
-if (( $VERBOSE >= 1 )); then
-    echo -n 'Mirror finished: '
-    date
-fi
+finish
