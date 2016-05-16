@@ -1,5 +1,10 @@
 #!/bin/zsh
-# Simple script to grab the file list from Fedora and rsync everything that's changed since the last time we pulled
+# Simple script to grab the file list from Fedora and rsync everything that's
+# changed since the last time we pulled.
+#
+# Originally written by Jason Tibbitts <tibbs@math.uh.edu> in 2016.
+# Donated to the public domain.  If you require a statement of license, please
+# consider this work to be licensed as "CC0 Universal", any version you choose.
 
 # Do this absolutely first
 STARTTIME=$(date +%s)
