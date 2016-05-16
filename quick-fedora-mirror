@@ -60,10 +60,10 @@ done
 
 # Check that the required parameters were provided
 if [[ -z $DESTD ]]; then
-    (>&2 echo "You must define DESTD in your configuration file ($configfile)."
+    (>&2 echo "You must define DESTD in your configuration file ($configfile).")
 fi
 if [[ -z $TIMEFILE ]]; then
-    (>&2 echo "You must define TIMEFILE in your configuration file ($configfile)."
+    (>&2 echo "You must define TIMEFILE in your configuration file ($configfile).")
 fi
 
 LASTTIME=0
@@ -74,7 +74,6 @@ fi
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
 cd $tempd
 trap "rm -rf $tempd" EXIT
-
 
 # Modify RSYNCOPTS based on verbosity
 # ZSHISM? (;& explicit case fallthrough)
@@ -147,7 +146,6 @@ for module in $MODULES; do
         fi
     done
 
-
     # Handle error returns.  5 is "too many connections"
     # We probably want to sleep with backoff and retry, and pull the rsync call
     # out to a separate function to make that easier.
@@ -212,7 +210,7 @@ sleep=1
 while true; do
     $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
     (( ? == 0 )) && break
-    db rsync failed; sleeping for $sleep
+    db rsync failed: sleeping for $sleep
     sleep $sleep
     sleep=$(( sleep*2 ))
     if (( sleep > 1000 )); then
@@ -224,7 +222,10 @@ done
 db Saving mirror time to $TIMEFILE
 echo LASTTIME=$starttime > $TIMEFILE
 
-# XXX Check for error in the above?
+if (( ? != 0 )); then
+    (>&2 echo Problem saving timestamp file $TIMEFILE)
+    exit 1
+fi
 
 if (( $VERBOSE >= 1 )); then
     echo -n 'Mirror finished: '
