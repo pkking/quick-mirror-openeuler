@@ -9,7 +9,7 @@ STARTTIME=$(($STARTTIME-5))
 # Utility functions
 
 db () {
-    (( VERBOSE > 0 )) && echo $*
+    (( VERBOSE > 0 )) && echo \>\> $*
 }
 
 # Mapping from module names to directories under fedora-buffet
@@ -25,7 +25,7 @@ MODULEMAPPING=(
     )
 
 # Default arguments; override in quick-fedora-mirror.conf
-VERBOSE=5
+VERBOSE=1
 
 DESTD=/srv/mirror/pub
 TIMEFILE=$DESTD/last-fedora-mirror
@@ -64,13 +64,13 @@ trap "rm -rf $TEMPD" EXIT
 # Modify RSYNCOPTS based on verbosity
 # ZSHISM? (;& explicit case fallthrough)
 case $VERBOSE in
-    6)
+    7)
         set +x
         ;&
-    5)
+    6)
         RSYNCOPTS+=(--progress)
         ;&
-    4)
+    5)
         echo Times:
         echo LASTTIME=$LASTTIME
         echo STARTTIME=$STARTTIME
@@ -87,10 +87,11 @@ case $VERBOSE in
         echo MODULES=$MODULES
         echo MODULEMAPPING=$MODULEMAPPING
         ;&
-    3)  RSYNCOPTS+=(-v)
+    4)  RSYNCOPTS+=(-v)
         ;&
-    2)  RSYNCOPTS+=(-v)
+    3)  RSYNCOPTS+=(-v)
         ;;
+    1)  ;&
     0)  RSYNCOPTS+=(-q)
         ;;
 esac
@@ -105,6 +106,7 @@ fi
 # We have to accumulate a big list of everything that needs to be
 # transferred from all of the modules
 for module in $MODULES; do
+    db Processing $module
     moduledir=$MODULEMAPPING[$module]
 
     # First fetch each filefiletimelist, and make one big transfer list from
@@ -112,16 +114,16 @@ for module in $MODULES; do
     echo Fetching file list for $i
     rm -f fullfiletimelist
 
-    db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    db -- $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
     $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    db
-    db rsync returned $?
+    db -- rsync returned $?
 
     # Handle error returns.  5 is "too many connections"
     # We probably want to sleep with backoff and retry, and pull the rsync call
     # out to a separate function to make that easier.
 
     # ZSHISM? (associative array indexing)
+    db ++ Extracting lists
     awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\"\$3}}" < $FILELIST >> newfiles
     # We always want to transfer the file list itself in the transaction.
     echo $moduledir/$FILELIST >> newfiles
@@ -139,33 +141,37 @@ for module in $MODULES; do
     # but which don't exist on the server.  If we do this here, before the
     # transfer, the directory mtimes will be correct after the transfer.
     if [[ -d $DESTD/$moduledir ]]; then
+        db ++ Generating local dir lists
         pushd $DESTD
         find $moduledir/* -type d -print > $TEMPD/localdirs
         popd
 
         # Computes the set difference between the first file and the third.
         sort alldirs alldirs localdirs | uniq -u > dirs-to-delete
+        db ++ Removing stale dirs
         for nuke in $(cat dirs-to-delete); do
             if [[ -d $DESTD/$nuke ]]; then
-                db Deleting $DESTD/$nuke
                 rm -rf $DESTD/$nuke
             fi
         done
 
+        db ++ Generating local file lists
         pushd $DESTD
         find $moduledir/* -type f -o -type l -print > $TEMPD/localfiles
         popd
         sort allfiles allfiles localfiles | uniq -u > files-to-delete
+        db ++ Removing stale files
         for nuke in $(cat files-to-delete); do
             if [[ -f $nuke || -h $nuke ]]; then
-                db Deleting $DESTD/$nuke
                 rm -f $DESTD/$nuke
             fi
         done
     fi
+    db Finished processing
 done
 
 # rsync docs suggest sorting the list for efficiency
+db Beginning transfer
 sort newfiles > newfiles.sorted
 
 # Now we have a list of everything which has changed recently in every module
@@ -179,4 +185,5 @@ $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
 
 
 # Should only do this if everything above succeeded
+db Saving mirror time to $TIMEFILE
 echo LASTTIME=$STARTTIME > $TIMEFILE
