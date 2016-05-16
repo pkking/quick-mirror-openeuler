@@ -13,6 +13,7 @@ db () {
 }
 
 # Mapping from module names to directories under fedora-buffet
+# ZSHISM (initialize associative array)
 typeset -A MODULEMAPPING
 MODULEMAPPING=(
     fedora-buffet0  ''
@@ -28,12 +29,12 @@ VERBOSE=5
 
 DESTD=/srv/mirror/pub
 TIMEFILE=$DESTD/last-fedora-mirror
-TRANSFERLIST=files-to-transfer
 
 REMOTE=rsync://dl.fedoraproject.org
 FILELIST=fullfiletimelist
 
 RSYNC=/usr/bin/rsync
+#ZSHISM? (initialize array with unsplit args)
 RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
 
 MASTERMODULE=fedora-buffet
@@ -61,6 +62,7 @@ trap "rm -rf $TEMPD" EXIT
 
 
 # Modify RSYNCOPTS based on verbosity
+# ZSHISM? (;& explicit case fallthrough)
 case $VERBOSE in
     6)
         set +x
@@ -94,43 +96,87 @@ case $VERBOSE in
 esac
 
 if [[ $MIRRORBUFFET -ne '0' ]]; then
-    # We only have to mirror the one big thing
-
-
-else
-    # We have to accumulate a big list of everything that needs to be
-    # transferred from all of the modules
-    for module in $MODULES; do
-        # First fetch each filefiletimelist, and make one big transfer list from
-        # all of them
-        echo Fetching file list for $i
-        rm -f fullfiletimelist
-
-        db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-        $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-        db
-        db rsync returned $?
-
-        # Handle error returns.  5 is "too many connections"
-        # We probably want to sleep with backoff and retry, and pull the rsync call
-        # out to a separate function to make that easier.
-
-        awk "{if (\$1 >= $LASTTIME) {print \"$MODULEMAPPING[$module]/\"\$3}}" < $FILELIST >> $TRANSFERLIST
-
-        # We always want to transfer the file list itself in the transaction.
-        echo $MODULEMAPPING[$module]/$FILELIST >> $TRANSFERLIST
-    done
+    # We want to mirror everything, so save the admin from listing the
+    # individual odules.
+    # ZSHISM (get keys from an associative array with (k))
+    MODULES=${(k)MODULEMAPPING}
 fi
 
-db Sorting.
-sort $TRANSFERLIST > $TRANSFERLIST.sorted
-cp $TRANSFERLIST.sorted ~
+# We have to accumulate a big list of everything that needs to be
+# transferred from all of the modules
+for module in $MODULES; do
+    moduledir=$MODULEMAPPING[$module]
+
+    # First fetch each filefiletimelist, and make one big transfer list from
+    # all of them
+    echo Fetching file list for $i
+    rm -f fullfiletimelist
+
+    db $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    db
+    db rsync returned $?
+
+    # Handle error returns.  5 is "too many connections"
+    # We probably want to sleep with backoff and retry, and pull the rsync call
+    # out to a separate function to make that easier.
+
+    # ZSHISM? (associative array indexing)
+    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\"\$3}}" < $FILELIST >> newfiles
+    # We always want to transfer the file list itself in the transaction.
+    echo $moduledir/$FILELIST >> newfiles
+
+    # Find updated dirs
+    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\"\$3}}" < $FILELIST >> newdirs
+
+    # Get just a list of all of all files and symlinks which should now be in the repository
+    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\"\$3}}" < $FILELIST >> allfiles
+
+    # And a list of all of the directories which should be in the repository
+    awk "{if (\$2 == \"d\") {print \"$moduledir/\"\$3}}" < $FILELIST >> alldirs
+
+    # We want to delete any files, symlinks or directories  which exist locally
+    # but which don't exist on the server.  If we do this here, before the
+    # transfer, the directory mtimes will be correct after the transfer.
+    if [[ -d $DESTD/$moduledir ]]; then
+        pushd $DESTD
+        find $moduledir/* -type d -print > $TEMPD/localdirs
+        popd
+
+        # Computes the set difference between the first file and the third.
+        sort alldirs alldirs localdirs | uniq -u > dirs-to-delete
+        for nuke in $(cat dirs-to-delete); do
+            if [[ -d $DESTD/$nuke ]]; then
+                db Deleting $DESTD/$nuke
+                rm -rf $DESTD/$nuke
+            fi
+        done
+
+        pushd $DESTD
+        find $moduledir/* -type f -o -type l -print > $TEMPD/localfiles
+        popd
+        sort allfiles allfiles localfiles | uniq -u > files-to-delete
+        for nuke in $(cat files-to-delete); do
+            if [[ -f $nuke || -h $nuke ]]; then
+                db Deleting $DESTD/$nuke
+                rm -f $DESTD/$nuke
+            fi
+        done
+    fi
+done
+
+# rsync docs suggest sorting the list for efficiency
+sort newfiles > newfiles.sorted
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db $RSYNC $RSYNCOPTS --files-from $TRANSFERLIST.sorted $REMOTE $DESTD
-$RSYNC $RSYNCOPTS --files-from $TRANSFERLIST.sorted $REMOTE/$MASTERMODULE/ $DESTD
+db $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE $DESTD
+$RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
+
+# We want to delete anything we have locally which isn't on the server, because
+# file deletions might have been missed in the copy.
+
 
 # Should only do this if everything above succeeded
 echo LASTTIME=$STARTTIME > $TIMEFILE
