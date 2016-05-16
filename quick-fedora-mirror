@@ -9,7 +9,7 @@ STARTTIME=$(($STARTTIME-5))
 # Utility functions
 
 db () {
-    (( VERBOSE > 0 )) && echo \>\> $*
+    (( VERBOSE >= 2 )) && echo \>\> $*
 }
 
 # Mapping from module names to directories under fedora-buffet
@@ -25,7 +25,7 @@ MODULEMAPPING=(
     )
 
 # Default arguments; override in quick-fedora-mirror.conf
-VERBOSE=1
+VERBOSE=0
 
 DESTD=/srv/mirror/pub
 TIMEFILE=$DESTD/last-fedora-mirror
@@ -64,13 +64,13 @@ trap "rm -rf $TEMPD" EXIT
 # Modify RSYNCOPTS based on verbosity
 # ZSHISM? (;& explicit case fallthrough)
 case $VERBOSE in
-    7)
+    8)
         set +x
         ;&
-    6)
+    7)
         RSYNCOPTS+=(--progress)
         ;&
-    5)
+    6)
         echo Times:
         echo LASTTIME=$LASTTIME
         echo STARTTIME=$STARTTIME
@@ -87,11 +87,16 @@ case $VERBOSE in
         echo MODULES=$MODULES
         echo MODULEMAPPING=$MODULEMAPPING
         ;&
+    5)  RSYNCOPTS+=(-v)
+        ;&
     4)  RSYNCOPTS+=(-v)
         ;&
-    3)  RSYNCOPTS+=(-v)
+    3)
+        ;&
+    2)  echo -n 'Mirror starting: '; date
         ;;
-    1)  ;&
+    1)  echo -n 'Mirror starting: '; date
+        ;&
     0)  RSYNCOPTS+=(-q)
         ;;
 esac
@@ -111,12 +116,22 @@ for module in $MODULES; do
 
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them
-    echo Fetching file list for $i
     rm -f fullfiletimelist
 
     db -- $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    db -- rsync returned $?
+    sleep=1
+    while true; do
+        $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+        (( ? == 0 )) && break
+        db rsync failed: sleeping for $sleep
+        sleep $sleep
+        sleep=$(( sleep*2 ))
+        if (( sleep > 1000 )); then
+            echo "Could not sync $REMOTE/$module/$FILELIST"
+            exit 1
+        fi
+    done
+
 
     # Handle error returns.  5 is "too many connections"
     # We probably want to sleep with backoff and retry, and pull the rsync call
@@ -178,12 +193,23 @@ sort newfiles > newfiles.sorted
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
 db $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE $DESTD
-$RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
+sleep=1
+while true; do
+    $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
+    (( ? == 0 )) && break
+    db rsync failed; sleeping for $sleep
+    sleep $sleep
+    sleep=$(( sleep*2 ))
+    if (( sleep > 1000 )); then
+        echo "Could not sync files from $REMOTE/$module"
+        exit 1
+    fi
+done
 
-# We want to delete anything we have locally which isn't on the server, because
-# file deletions might have been missed in the copy.
-
-
-# Should only do this if everything above succeeded
 db Saving mirror time to $TIMEFILE
 echo LASTTIME=$STARTTIME > $TIMEFILE
+
+if (( $VERBOSE >= 1 )); then
+    echo -n 'Mirror finished: '
+    date
+fi
