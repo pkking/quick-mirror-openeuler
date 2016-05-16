@@ -126,7 +126,7 @@ if [[ $MIRRORBUFFET -ne '0' ]]; then
     # We want to mirror everything, so save the admin from listing the
     # individual odules.
     # ZSHISM (get keys from an associative array with (k))
-    MODULES=${(k)MODULEMAPPING}
+    MODULES=(${(k)MODULEMAPPING})
 fi
 
 # We have to accumulate a big list of everything that needs to be
@@ -166,18 +166,18 @@ for module in $MODULES; do
 
     # ZSHISM? (associative array indexing)
     db ++ Extracting lists
-    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\"\$3}}" < $FILELIST >> newfiles
+    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newfiles
     # We always want to transfer the file list itself in the transaction.
     echo $moduledir/$FILELIST >> newfiles
 
     # Find updated dirs
-    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\"\$3}}" < $FILELIST >> newdirs
+    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newdirs
 
     # Get just a list of all of all files and symlinks which should now be in the repository
-    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\"\$3}}" < $FILELIST >> allfiles
+    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> allfiles
 
     # And a list of all of the directories which should be in the repository
-    awk "{if (\$2 == \"d\") {print \"$moduledir/\"\$3}}" < $FILELIST >> alldirs
+    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> alldirs
 
     # We want to delete any files, symlinks or directories  which exist locally
     # but which don't exist on the server.  If we do this here, before the
