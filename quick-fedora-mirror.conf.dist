@@ -1,0 +1,47 @@
+# Configuration file for quick-fedora-mirror
+
+# This file is sourced by the shell and must be in valid sh syntax.
+
+
+#### Required settings
+# Required: The the directory holding your copy of all of the modules you
+# mirror.  Does not include any module name
+DESTD=
+
+# Required: The file in which to store the last mirror time.
+# Note: this really should not be in the repository itself.
+TIMEFILE=
+
+# Other settings
+# The remote host to rsync from, not including a module name
+# REMOTE=rsync://dl.fedoraproject.org
+
+# The master module, which holds the other modules
+# Tier 1 mirrors should change this to fedora-buffet0
+# MASTERMODULE=fedora-buffet
+
+# Set to 1 if the entire repository (all modules under fedora-buffet) should be
+# mirrored.  If set, MODULES (below) is ignored
+# MIRRORBUFFET=0
+
+# An array containing the modules to be mirrored
+# MODULES=(fedora-enchilada fedora-epel)
+
+# The name of the file holding the file list on the mirror host
+# FILELIST=fullfiletimelist
+
+# Verbosity level
+# VERBOSRE=0
+
+# Mapping of MODULES to directory names, as an associative array
+# MODULEMAPPING=(fedora-alt alt  fedora-archive archive
+#                fedora-enchilada fedora  fedora-epel epel)
+
+# rsync binary
+# RSYNC=/usr/bin/rsync
+
+# Array of default options to pass to rsync
+# Will be modified automatically according to VERBOSITY level; no need to set
+# -q or -v here
+# RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
+

@@ -6,10 +6,12 @@
 # Donated to the public domain.  If you require a statement of license, please
 # consider this work to be licensed as "CC0 Universal", any version you choose.
 
+# Variables in upper case are user configurables.
+
 # Do this absolutely first
-STARTTIME=$(date +%s)
+starttime=$(date +%s)
 # Paranoia
-STARTTIME=$(($STARTTIME-5))
+starttime=$(($starttime-5))
 
 # Utility functions
 
@@ -32,8 +34,8 @@ MODULEMAPPING=(
 # Default arguments; override in quick-fedora-mirror.conf
 VERBOSE=0
 
-DESTD=/srv/mirror/pub
-TIMEFILE=$DESTD/last-fedora-mirror
+DESTD=
+TIMEFILE=
 
 REMOTE=rsync://dl.fedoraproject.org
 FILELIST=fullfiletimelist
@@ -44,26 +46,34 @@ RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
 
 MASTERMODULE=fedora-buffet
 MIRRORBUFFET=0
-MODULES=(fedora-epel)
+MODULES=(fedora-enchilada fedora-epel)
 
 # Load up the configuration file
-for i in /etc/quick-fedora-mirror.conf \
+for configfile in /etc/quick-fedora-mirror.conf \
         ~/.config/quick-fedora-mirror.conf \
         $(dirname $0)/quick-fedora-mirror.conf \
         ./quick-fedora-mirror.conf; do
-    if [[ -f $i ]]; then
-        source $i
+    if [[ -f $configfile ]]; then
+        source $configfile
     fi
 done
+
+# Check that the required parameters were provided
+if [[ -z $DESTD ]]; then
+    (>&2 echo "You must define DESTD in your configuration file ($configfile)."
+fi
+if [[ -z $TIMEFILE ]]; then
+    (>&2 echo "You must define TIMEFILE in your configuration file ($configfile)."
+fi
 
 LASTTIME=0
 if [[ -r $TIMEFILE ]]; then
     source $TIMEFILE
 fi
 
-TEMPD=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
-cd $TEMPD
-trap "rm -rf $TEMPD" EXIT
+tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
+cd $tempd
+trap "rm -rf $tempd" EXIT
 
 
 # Modify RSYNCOPTS based on verbosity
@@ -78,10 +88,10 @@ case $VERBOSE in
     6)
         echo Times:
         echo LASTTIME=$LASTTIME
-        echo STARTTIME=$STARTTIME
+        echo starttime=$starttime
         echo TIMEFILE=$TIMEFILE
         echo Dirs:
-        echo TEMPD=$TEMPD
+        echo tempd=$tempd
         echo DESTD=$DESTD
         echo Rsync:
         echo REMOTE=$REMOTE
@@ -132,7 +142,7 @@ for module in $MODULES; do
         sleep $sleep
         sleep=$(( sleep*2 ))
         if (( sleep > 1000 )); then
-            echo "Could not sync $REMOTE/$module/$FILELIST"
+            (>&2 echo "Could not sync $REMOTE/$module/$FILELIST")
             exit 1
         fi
     done
@@ -163,7 +173,7 @@ for module in $MODULES; do
     if [[ -d $DESTD/$moduledir ]]; then
         db ++ Generating local dir lists
         pushd $DESTD
-        find $moduledir/* -type d -print > $TEMPD/localdirs
+        find $moduledir/* -type d -print > $tempd/localdirs
         popd
 
         # Computes the set difference between the first file and the third.
@@ -177,7 +187,7 @@ for module in $MODULES; do
 
         db ++ Generating local file lists
         pushd $DESTD
-        find $moduledir/* -type f -o -type l -print > $TEMPD/localfiles
+        find $moduledir/* -type f -o -type l -print > $tempd/localfiles
         popd
         sort allfiles allfiles localfiles | uniq -u > files-to-delete
         db ++ Removing stale files
@@ -206,13 +216,15 @@ while true; do
     sleep $sleep
     sleep=$(( sleep*2 ))
     if (( sleep > 1000 )); then
-        echo "Could not sync files from $REMOTE/$module"
+        (>&2 echo "Could not sync files from $REMOTE/$module")
         exit 1
     fi
 done
 
 db Saving mirror time to $TIMEFILE
-echo LASTTIME=$STARTTIME > $TIMEFILE
+echo LASTTIME=$starttime > $TIMEFILE
+
+# XXX Check for error in the above?
 
 if (( $VERBOSE >= 1 )); then
     echo -n 'Mirror finished: '
