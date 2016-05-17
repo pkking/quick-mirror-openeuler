@@ -2,9 +2,10 @@ Utilities for mirroring Fedora faster
 =====================================
 
 A full rsync of fedora-buffet0 can take hours just to receive the file list,
-due to the fact that there are over 12.4 million files.  And this has to happen
-for every client, which is murderous on the download servers and worse on the
-backend NFS server.
+due to the fact that there are over 12.4 million files.  This has to happen for
+every client, every time they want to update, which is murderous on the
+download servers and worse on the backend NFS server.  It also slows the
+propagation of important updates because mirrors simply can't poll often.
 
 By generating a simple database of file and directory timestamps, it becomes
 easy for the client to determine which files have changed since the last mirror
