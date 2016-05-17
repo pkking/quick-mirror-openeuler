@@ -27,6 +27,34 @@ finish () {
     fi
 }
 
+# Parse args
+while [[ $# > 1 ]]; do
+    opt=$1
+    case $opt in
+        -c)
+            cfgfile=$2
+            shift
+            if [[ ! -r $cfgfile ]]; then
+                (>&2 echo Cannot read $cfgfile)
+                exit 1
+            fi
+            ;;
+        -t)
+            backdate=$2
+            shift
+            ;;
+        -T)
+            backdate=$(date -d "$2" +%s)
+            shift
+            ;;
+        *)
+            (>&2 echo "Unrecognized argument.")
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 # Mapping from module names to directories under fedora-buffet
 # ZSHISM (initialize associative array)
 typeset -A MODULEMAPPING
@@ -56,12 +84,13 @@ MIRRORBUFFET=0
 MODULES=(fedora-enchilada fedora-epel)
 
 # Load up the configuration file
-for configfile in /etc/quick-fedora-mirror.conf \
+for file in $cfgfile /etc/quick-fedora-mirror.conf \
         ~/.config/quick-fedora-mirror.conf \
         $(dirname $0)/quick-fedora-mirror.conf \
         ./quick-fedora-mirror.conf; do
-    if [[ -f $configfile ]]; then
-        source $configfile
+    if [[ -r $file ]]; then
+        source $file
+        break
     fi
 done
 
@@ -73,9 +102,13 @@ if [[ -z $TIMEFILE ]]; then
     (>&2 echo "You must define TIMEFILE in your configuration file ($configfile).")
 fi
 
+# Find the previous mirror time, and backdate if necessary
 LASTTIME=0
 if [[ -r $TIMEFILE ]]; then
     source $TIMEFILE
+fi
+if [[ -n $backdate ]]; then
+    LASTTIME=backdate
 fi
 
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
