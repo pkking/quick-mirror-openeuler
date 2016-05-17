@@ -10,9 +10,9 @@ propagation of important updates because mirrors simply can't poll often.
 By generating a simple database of file and directory timestamps, it becomes
 easy for the client to determine which files have changed since the last mirror
 run and only mirror those files.  This also provides enough information to
-handle files which have been deleted on the server.  And if the timestamps are
-chosen properly, it allows hardlinks to be copied as hardlinks instead of
-copying the files multiple times.
+handle files which have been deleted on the server and files which are missing
+on the client.  In most situations, it also allows hardlinks to be copied as
+hardlinks instead of being downloaded multiple times.
 
 Client
 ======
