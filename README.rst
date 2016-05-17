@@ -102,12 +102,11 @@ Downstream Mirrors
 ==================
 
 Note that this method works for downstream mirrors as well.  Intermediate
-mirrors should *not* modify the filelists.  Even though the timestamps
-(specifically, ctime) may differ, the file list is still a valid source of data
-even for mirrors far down the chain.  Assuming ``rsync`` is called with
---delay-updates, downstream should always have a consistent view of the
-repository.  Changes should get out very quickly, because mirrors can poll
-frequently without overloading servers.
+mirrors should *not* modify the filelists.
+
+Assuming ``rsync`` is called with --delay-updates, downstream mirrors should
+always have a consistent view of the repository.  Changes should get out very
+quickly, because mirrors can poll frequently without overloading servers.
 
 Authorship and License
 ======================
