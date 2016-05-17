@@ -1,7 +1,5 @@
 # Configuration file for quick-fedora-mirror
-
 # This file is sourced by the shell and must be in valid sh syntax.
-
 
 #### Required settings
 # Required: The the directory holding your copy of all of the modules you

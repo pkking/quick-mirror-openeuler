@@ -34,6 +34,48 @@ are copied together, hardlinks between modules will be copied as hardlinks.
 
 The speed improvements can be extraordinary.
 
+Installation
+------------
+
+Copy ``quick-fedora-mirror`` somewhere.  Copy ``quick-fedora-mirror.conf.dist``
+to ``quick-fedora-mirror.conf``, edit as appropriate and copy to one of the
+following:
+
+* /etc
+
+* ~/.config
+
+* The directory where quick-fedora-mirror lives
+
+* The current directory when quick-fedora-mirror runs
+
+(There is not currently any option parsing, so no way to specify the config
+file on the command line.)
+
+Initial Run
+-----------
+
+The last mirror time is assumed to be the epoch if ``quick-fedora-mirror`` has
+not previously been run.  This means that every single file will be checked,
+which will take forever.
+
+If you are certain your mirror is up to date, you can just fudge the last mirror date::
+
+    date -d 'last week' +LASTTIME=%s > lastmirrortime
+
+Then your run will only examine files which have changed in the last week.
+This may still be a lot of files, but not all of them.
+
+Adding a module
+---------------
+
+If you have to add a module after the fact, note that rsync will not pick up
+any hardlinks.  You can of course do the download and then run hardlink
+afterwards, or do a special run with just the new module and the other modules
+which have many shared links.  Most of the links are between fedora-archive and
+fedora-enchilada, or fedora-alt and fedora-enchilada.
+
+
 Server
 ======
 
@@ -65,3 +107,11 @@ even for mirrors far down the chain.  Assuming ``rsync`` is called with
 --delay-updates, downstream should always have a consistent view of the
 repository.  Changes should get out very quickly, because mirrors can poll
 frequently without overloading servers.
+
+Authorship and License
+======================
+
+All of this code was originally written by Jason Tibbitts <tibbs@math.uh.edu>
+has been donated to the public domain.  If you require a statement of license,
+please consider this work to be licensed as "CC0 Universal", any version you
+choose.
