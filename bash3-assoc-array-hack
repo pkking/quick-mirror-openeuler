@@ -1,0 +1,18 @@
+function get_mapping(){
+  local key=$1;
+  local mapping=(
+      "fedora-alt:alt"
+      "fedora-archive:archive"
+      "fedora-enchilada:fedora"
+      "fedora-epel:epel"
+      "fedora-secondary:fedora-secondary"
+  );
+
+  for map in ${mapping[@]}; do
+    if [[ "${map}" =~ "${key}:" ]]; then
+      echo ${map##*:};
+    fi;
+  done;
+}
+
+get_mapping $1
