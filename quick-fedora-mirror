@@ -1,4 +1,5 @@
 #!/bin/zsh
+LANG=C
 # Simple script to grab the file list from Fedora and rsync everything that's
 # changed since the last time we pulled.
 #
@@ -15,9 +16,10 @@ starttime=$(($starttime-5))
 
 # Utility functions
 
-db () { (( VERBOSE >= 2 )) && echo \>\> $* }
-db2 () { (( VERBOSE >= 3 )) && echo \>\> $* }
-db3 () { (( VERBOSE >= 4 )) && echo \>\> $* }
+db () { (( VERBOSE >= 2 )) && echo '>>' $* }
+db2 () { (( VERBOSE >= 3 )) && echo '>>>>' $* }
+b3 () { (( VERBOSE >= 4 )) && echo '>>>>>>' $* }
+sep () { (( VERBOSE >= 1 )) && echo '============================================================' }
 
 finish () {
     if (( $VERBOSE >= 1 )); then
@@ -38,6 +40,10 @@ while [[ $# > 1 ]]; do
                 (>&2 echo Cannot read $cfgfile)
                 exit 1
             fi
+            ;;
+        -d)
+            verboseopt=$2
+            shift
             ;;
         -t)
             backdate=$2
@@ -94,6 +100,9 @@ for file in $cfgfile /etc/quick-fedora-mirror.conf \
     fi
 done
 
+# Override with the command-line option
+[[ -n $verboseopt ]] && VERBOSE=$verboseopt
+
 # Check that the required parameters were provided
 if [[ -z $DESTD ]]; then
     (>&2 echo "You must define DESTD in your configuration file ($configfile).")
@@ -112,14 +121,15 @@ if [[ -n $backdate ]]; then
 fi
 
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
-cd $tempd
 trap "rm -rf $tempd" EXIT
+cd $tempd
 
 # Modify RSYNCOPTS based on verbosity
 # ZSHISM? (;& explicit case fallthrough)
 case $VERBOSE in
     8)
-        set +x
+        echo Loads of debugging.
+        set -x
         ;&
     7)
         RSYNCOPTS+=(--progress)
@@ -140,6 +150,7 @@ case $VERBOSE in
         echo Modules:
         echo MODULES=$MODULES
         echo MODULEMAPPING=$MODULEMAPPING
+        echo
         ;&
     5)  RSYNCOPTS+=(-v)
         ;&
@@ -147,9 +158,9 @@ case $VERBOSE in
         ;&
     3)
         ;&
-    2)  echo -n 'Mirror starting: '; date
+    2)  echo -n 'Mirror starting: '; date; echo
         ;;
-    1)  echo -n 'Mirror starting: '; date
+    1)  echo -n 'Mirror starting: '; date; echo
         ;&
     0)  RSYNCOPTS+=(-q)
         ;;
@@ -165,8 +176,12 @@ fi
 # We have to accumulate a big list of everything that needs to be
 # transferred from all of the modules
 for module in $MODULES; do
+    sep
     db Processing $module
+
+    # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
+    totallines=0
 
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them  Copy in the old file from our repo to speed up rsync in case
@@ -178,11 +193,14 @@ for module in $MODULES; do
     fi
 
 
-    db -- $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    db2 $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
     sleep=1
     while true; do
         $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-        (( ? == 0 )) && break
+        rsyncreturn=$?
+        # rsync will return 5 if the host says it's too busy, and 10 if the
+        # connection was refused or the host doesn't resolve.
+        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
         db rsync failed: sleeping for $sleep
         sleep $sleep
         sleep=$(( sleep*2 ))
@@ -193,26 +211,36 @@ for module in $MODULES; do
     done
 
     if [[ $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
-        db No change in file list mtime: skipping $module
+        db No change in file list mtime.  Skipping $module.
         continue
     fi
 
-    # ZSHISM? (associative array indexing)
     db ++ Extracting lists
 
     # Get files on the server which changed since the last mirror
-    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newfiles
+    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newfiles-$module
     # We always want to transfer the file list itself in the transaction.
-    echo $moduledir/$FILELIST >> newfiles
+    echo $moduledir/$FILELIST >> newfiles-$module
+    linecount=$(wc -l < newfiles-$module)
+    db2 Found $linecount new or updated files in $module since last run.
+    cat newfiles-$module >> transferlist
+    totallines=$((totallines+linecount))
 
     # Dirs on the werver which changed since the last mirror
-    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newdirs
+    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
+    linecount=$(wc -l < newdirs-$module)
+    db2 Found $linecount new or updated dirs in $module since last run.
+    cat newdirs-$module >> transferlist
+    totallines=$((totallines+linecount))
 
-    # Get just a list of all of all files and symlinks which should now be in the repository
-    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> allfiles
+    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
+    linecount=$(wc -l < allfiles-$module)
+    db2 Found $linecount remote files in $module.
 
     # Get a list of all of the directories which should be in the repository
-    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> alldirs
+    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > alldirs-$module
+    linecount=$(wc -l < alldirs-$module)
+    db2 Found $linecount remote dirs in $module.
 
     # We want to delete any files, symlinks or directories  which exist locally
     # but which don't exist on the server.  If we do this here, before the
@@ -220,58 +248,82 @@ for module in $MODULES; do
     if [[ -d $DESTD/$moduledir ]]; then
         db ++ Generating local dir lists
         pushd $DESTD
-        find $moduledir/* -type d -print > $tempd/localdirs
+        find $moduledir/* -type d > $tempd/localdirs-$module
         popd
 
+        linecount=$(wc -l < localdirs-$module)
+        db2 Found $linecount local dirs in $module.
+
         # Computes the set difference between the first file and the third.
-        sort alldirs alldirs localdirs | uniq -u > dirs-to-delete
-        db ++ Removing stale dirs
-        for nuke in $(cat dirs-to-delete); do
+        sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
+        linecount=$(wc -l < deletedirs-$module)
+        # XXX push these deletes down until after the big rsync run
+        db ++ Recursively removing $linecount stale dirs from $moduledir.
+        for nuke in $(cat deletedirs-$module); do
             if [[ -d "$DESTD/$nuke" ]]; then
-                db3 ++++ Removing $nuke
+                db3 Removing $nuke
                 rm -rf "$DESTD/$nuke"
             fi
         done
 
         # Find dirs on the server which are missing on the client
-        sort localdirs localdirs alldirs | uniq -u >> newdirs
+        sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
+        linecount=$(wc -l < missingdirs-$module)
+        db2 Found $linecount missing dirs in $module.
+        cat missingdirs-$module >> transferlist
+        totallines=$((totallines+linecount))
 
         db ++ Generating local file lists
         pushd $DESTD
-        find $moduledir/* -type f -o -type l -print > $tempd/localfiles
+        echo find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
+        find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         popd
-        sort allfiles allfiles localfiles | uniq -u > files-to-delete
-        db ++ Removing stale files
-        for nuke in $(cat files-to-delete); do
+
+        linecount=$(wc -l < localfiles-$module)
+        db2 Found $linecount local files in $module.
+
+
+        sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
+        linecount=$(wc -l < deletefiles-$module)
+        # XXX push these deletes down until after the big rsync run
+        db ++ Removing $linecount stale files from $module.
+        for nuke in $(cat deletefiles-$module); do
             if [[ -f "$nuke" || -h "$nuke" ]]; then
-                db3 ++++ Removing $nuke
+                db3 Removing $nuke
                 rm -f "$DESTD/$nuke"
             fi
         done
 
         # Find files on the server which are missing on the client
-        sort localfiles localfiles allfiles | uniq -u >> newfiles
+        sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
+        linecount=$(wc -l < missingfiles-$module)
+        db2 Found $linecount missing files in $module.
+        cat missingfiles-$module >> transferlist
+        totallines=$((totallines+linecount))
+
     fi
-    db Finished processing
+    db Finished processing.  Added $totallines files and dirs to the transfer list.
 done
 
-if [[ ! -e newfiles ]]; then
+if [[ ! -e transferlist ]]; then
     db No changed files.
     finish
 fi
 
 # rsync prefers sorted file lists and will complain if there are duplicates
-sort newfiles | uniq > newfiles.sorted
-db Beginning transfer
+sort -u transferlist > transferlist.sorted
+linecount=$(wc -l < transferlist.sorted)
+db Beginning transfer of $linecount files.
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE $DESTD
+db2 $RSYNC $RSYNCOPTS files-from transferlist.sorted $REMOTE $DESTD
 sleep=1
 while true; do
-    $RSYNC $RSYNCOPTS --files-from newfiles.sorted $REMOTE/$MASTERMODULE/ $DESTD
-    (( ? == 0 )) && break
+    $RSYNC $RSYNCOPTS --files-from transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+    rsyncreturn=$?
+    (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
     db rsync failed: sleeping for $sleep
     sleep $sleep
     sleep=$(( sleep*2 ))

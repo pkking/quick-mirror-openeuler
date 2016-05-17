@@ -28,9 +28,10 @@ the file to store the last mirror time must be set, though you probably want to
 set the list of modules to mirror as well.
 
 The client downloads the master file list for each module, generates lists of
-new files, deletes files and directories which no longer exist on the server,
-and passes one combined list to rsync via --files-from.  Because all modules
-are copied together, hardlinks between modules will be copied as hardlinks.
+new and updated files, deletes files and directories which no longer exist on
+the server, and passes one combined list to rsync via --files-from.  Because
+all modules are copied together, hardlinks between modules will be copied as
+hardlinks.
 
 The speed improvements can be extraordinary.
 
@@ -57,13 +58,18 @@ Options
 -c
     Configuration file to use.
 
+-d
+    Set output verbosity.  See the VERBOSE setting in the sample configuration
+    file for details.
+
 -t
     Instead of the previous run time, use this.  Should be an integer
     representing the seconds since the epoch.
 
 -T
-    Instead of the previous run time, use this.  The value is passed to date
-    -d.
+    Instead of the previous run time, use this.  The value is passed to ``date
+    -d``, so it should be in a format which date recognizes.  ``yesterday`` and
+    ``last week`` are useful.  Remember to quote if there are spaces.
 
 Initial Run
 -----------
