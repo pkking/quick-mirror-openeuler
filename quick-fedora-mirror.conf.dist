@@ -28,9 +28,6 @@ TIMEFILE=
 # The name of the file holding the file list on the mirror host
 # FILELIST=fullfiletimelist
 
-# Verbosity level
-# VERBOSRE=0
-
 # Mapping of MODULES to directory names, as an associative array
 # MODULEMAPPING=(fedora-alt alt  fedora-archive archive
 #                fedora-enchilada fedora  fedora-epel epel)
@@ -42,4 +39,17 @@ TIMEFILE=
 # Will be modified automatically according to VERBOSITY level; no need to set
 # -q or -v here
 # RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
+
+# Verbosity level
+# 0 - quiet
+# 1 - start and end times
+# 2 - no -q to rsync
+# 3 - very slightly more verbosity
+# 4 - One -v to rsync
+# 5 - Another -v to rsync
+# 6 - Output of all settings
+# 7 - Add --progress to rsync
+# 8 - Shell script trace
+# VERBOSE=0
+
 
