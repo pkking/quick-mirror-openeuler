@@ -49,33 +49,46 @@ following:
 
 * The current directory when quick-fedora-mirror runs
 
-(There is not currently any option parsing, so no way to specify the config
-file on the command line.)
+* Anywhere you like, if you specify the path on the command line.
+
+Options
+-------
+
+-c
+    Configuration file to use.
+
+-t
+    Instead of the previous run time, use this.  Should be an integer
+    representing the seconds since the epoch.
+
+-T
+    Instead of the previous run time, use this.  The value is passed to date
+    -d.
 
 Initial Run
 -----------
 
 The last mirror time is assumed to be the epoch if ``quick-fedora-mirror`` has
 not previously been run.  This means that every single file will be checked,
-which will take forever.
+which will take many hours.  If you are certain your mirror is up to date, you
+can just fudge the last mirror date::
 
-If you are certain your mirror is up to date, you can just fudge the last mirror date::
+    quick-fedora-mirror -T 'last week'
 
-    date -d 'last week' +LASTTIME=%s > lastmirrortime
-
-(Obviously, use the timestamp file you chose in your configuration file.)
 Then your run will only examine files which have changed in the last week.
 This may still be a lot of files, but not all of them.
 
 Adding a module
 ---------------
 
-If you have to add a module after the fact, note that rsync will not pick up
-any hardlinks.  You can of course do the download and then run hardlink
-afterwards, or do a special run with just the new module and the other modules
-which have many shared links.  Most of the links are between fedora-archive and
-fedora-enchilada, or fedora-alt and fedora-enchilada.
-
+If you have to add a module after the fact (i.e. you already have
+fedora-enchilada and you want to add fedora-alt), note that rsync will not pick
+up any hardlinks.  You can of course do the download and then run hardlink
+afterwards, or do a full transfer (i.e. using ``-t 0``).  To minimize the sime
+spent counting files, you use a configuration file which specifies only the
+modules with which the new module shares hardlinks.  Most of the hardlinks are
+between fedora-archive and fedora-enchilada, or fedora-alt and
+fedora-enchilada.
 
 Server
 ======
