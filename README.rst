@@ -55,6 +55,11 @@ following:
 Options
 -------
 
+-a
+    Always check the file list.  This disables the optimization which doesn't
+    process the file list if it hasn't changed from the local copy.
+    Useful if you believe that some files have gone missing Configuratio
+
 -c
     Configuration file to use.
 

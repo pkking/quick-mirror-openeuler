@@ -25,14 +25,18 @@ finish () {
     if (( $VERBOSE >= 1 )); then
         echo -n 'Mirror finished: '
         date
-        exit 0
     fi
+    exit 0
 }
 
 # Parse args
 while [[ $# > 1 ]]; do
     opt=$1
     case $opt in
+        -a)
+            echo Always doing full checking.
+            alwayscheck=1
+            ;;
         -c)
             cfgfile=$2
             shift
@@ -210,7 +214,7 @@ for module in $MODULES; do
         fi
     done
 
-    if [[ $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
+    if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
         db No change in file list mtime.  Skipping $module.
         continue
     fi
@@ -219,10 +223,11 @@ for module in $MODULES; do
 
     # Get files on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newfiles-$module
-    # We always want to transfer the file list itself in the transaction.
-    echo $moduledir/$FILELIST >> newfiles-$module
     linecount=$(wc -l < newfiles-$module)
     db2 Found $linecount new or updated files in $module since last run.
+
+    # We always want to transfer the file list itself in the transaction.
+    echo $moduledir/$FILELIST >> newfiles-$module
     cat newfiles-$module >> transferlist
     totallines=$((totallines+linecount))
 
