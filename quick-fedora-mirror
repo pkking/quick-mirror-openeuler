@@ -18,7 +18,7 @@ starttime=$(($starttime-5))
 
 db () { (( VERBOSE >= 2 )) && echo '>>' $* }
 db2 () { (( VERBOSE >= 3 )) && echo '>>>>' $* }
-b3 () { (( VERBOSE >= 4 )) && echo '>>>>>>' $* }
+db3 () { (( VERBOSE >= 4 )) && echo '>>>>>>' $* }
 sep () { (( VERBOSE >= 1 )) && echo '============================================================' }
 
 finish () {
@@ -313,6 +313,7 @@ fi
 # rsync prefers sorted file lists and will complain if there are duplicates
 sort -u transferlist > transferlist.sorted
 linecount=$(wc -l < transferlist.sorted)
+sep; sep
 db Beginning transfer of $linecount files.
 
 # Now we have a list of everything which has changed recently in every module
