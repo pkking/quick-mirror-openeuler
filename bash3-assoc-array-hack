@@ -1,3 +1,5 @@
+# This file is here to remind me how to do associative arrays in bash3.
+# Thanks again to "kad" on #fedora-devel.
 function get_mapping(){
   local key=$1;
   local mapping=(
