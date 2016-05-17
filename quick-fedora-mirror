@@ -199,17 +199,19 @@ for module in $MODULES; do
 
     # ZSHISM? (associative array indexing)
     db ++ Extracting lists
+
+    # Get files on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newfiles
     # We always want to transfer the file list itself in the transaction.
     echo $moduledir/$FILELIST >> newfiles
 
-    # Find updated dirs
+    # Dirs on the werver which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> newdirs
 
     # Get just a list of all of all files and symlinks which should now be in the repository
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> allfiles
 
-    # And a list of all of the directories which should be in the repository
+    # Get a list of all of the directories which should be in the repository
     awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST >> alldirs
 
     # We want to delete any files, symlinks or directories  which exist locally
@@ -231,6 +233,9 @@ for module in $MODULES; do
             fi
         done
 
+        # Find dirs on the server which are missing on the client
+        sort localdirs localdirs alldirs | uniq -u >> newdirs
+
         db ++ Generating local file lists
         pushd $DESTD
         find $moduledir/* -type f -o -type l -print > $tempd/localfiles
@@ -243,17 +248,21 @@ for module in $MODULES; do
                 rm -f "$DESTD/$nuke"
             fi
         done
+
+        # Find files on the server which are missing on the client
+        sort localfiles localfiles allfiles | uniq -u >> newfiles
     fi
     db Finished processing
 done
 
-# rsync docs suggest sorting the list for efficiency
 if [[ ! -e newfiles ]]; then
     db No changed files.
     finish
 fi
+
+# rsync prefers sorted file lists and will complain if there are duplicates
+sort newfiles | uniq > newfiles.sorted
 db Beginning transfer
-sort newfiles > newfiles.sorted
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
