@@ -63,6 +63,7 @@ If you are certain your mirror is up to date, you can just fudge the last mirror
 
     date -d 'last week' +LASTTIME=%s > lastmirrortime
 
+(Obviously, use the timestamp file you chose in your configuration file.)
 Then your run will only examine files which have changed in the last week.
 This may still be a lot of files, but not all of them.
 
