@@ -108,7 +108,7 @@ if [[ -r $TIMEFILE ]]; then
     source $TIMEFILE
 fi
 if [[ -n $backdate ]]; then
-    LASTTIME=backdate
+    LASTTIME=$backdate
 fi
 
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
