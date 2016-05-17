@@ -1,4 +1,4 @@
-A utilies for mirroring Fedora faster
+Utilities for mirroring Fedora faster
 =====================================
 
 A full rsync of fedora-buffet0 can take hours just to receive the file list,
