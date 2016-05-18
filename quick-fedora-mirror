@@ -88,7 +88,7 @@ FILELIST=fullfiletimelist
 
 RSYNC=/usr/bin/rsync
 #ZSHISM? (initialize array with unsplit args)
-RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
+RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --preallocate --fuzzy --delete-delay --delay-updates)
 
 MASTERMODULE=fedora-buffet
 MIRRORBUFFET=0
