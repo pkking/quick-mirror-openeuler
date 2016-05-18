@@ -149,7 +149,7 @@ case $VERBOSE in
         echo DESTD=$DESTD
         echo Rsync:
         echo REMOTE=$REMOTE
-        echo MASTERMODULE=$REMOTE
+        echo MASTERMODULE=$MASTERMODULE
         echo RSYNC=$RSYNC
         echo RSYNCOPTS=$RSYNCOPTS
         echo Modules:
@@ -173,7 +173,7 @@ esac
 
 if [[ $MIRRORBUFFET -ne '0' ]]; then
     # We want to mirror everything, so save the admin from listing the
-    # individual odules.
+    # individual modules.
     # ZSHISM (get keys from an associative array with (k))
     MODULES=(${(k)MODULEMAPPING})
 fi
@@ -189,7 +189,7 @@ for module in $MODULES; do
     totallines=0
 
     # First fetch each filefiletimelist, and make one big transfer list from
-    # all of them  Copy in the old file from our repo to speed up rsync in case
+    # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
     rm -f $FILELIST
     if [[ -f $DESTD/$moduledir/$FILELIST ]]; then
@@ -232,13 +232,14 @@ for module in $MODULES; do
     cat newfiles-$module >> master-transferlist
     totallines=$((totallines+linecount))
 
-    # Dirs on the werver which changed since the last mirror
+    # Dirs on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
     linecount=$(wc -l < newdirs-$module)
     db2 Found $linecount new or updated dirs in $module since last run.
     cat newdirs-$module >> master-transferlist
     totallines=$((totallines+linecount))
 
+    # Get a list of all files which should be in the repository
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
     linecount=$(wc -l < allfiles-$module)
     db2 Found $linecount remote files in $module.
@@ -275,12 +276,13 @@ for module in $MODULES; do
 
         db ++ Generating local file lists
         pushd $DESTD
-        echo find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
+        db3 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
         find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         popd
         linecount=$(wc -l < localfiles-$module)
         db2 Found $linecount local files in $module.
 
+	# Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
         linecount=$(wc -l < deletefiles-$module)
         db ++ Will remove $linecount stale files from $module.
@@ -311,7 +313,7 @@ db Beginning transfer of $linecount files.
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db2 $RSYNC $RSYNCOPTS files-from master-transferlist.sorted $REMOTE $DESTD
+db2 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
 sleep=1
 while true; do
     $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
