@@ -1,0 +1,21 @@
+#!/bin/sh
+
+TOPD=/pub
+FILELIST=fullfiletimelist
+
+MOD=$1
+[ -z "$MOD" ] && {
+    echo "usage: $0 <module>"
+    exit 1
+}
+
+TMPFILE=$(mktemp -p /tmp/)
+pushd $TOPD/$MOD > /dev/null
+create-filelist . > $TMPFILE
+if diff $TMPFILE $FILELIST > /dev/null; then
+    rm -f $TMPFILE
+else
+    mv $TMPFILE fullfiletimelist
+fi
+chmod 0644 fullfiletimelist
+popd > /dev/null
