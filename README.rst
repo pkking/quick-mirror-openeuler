@@ -31,9 +31,14 @@ The client downloads the master file list for each module, generates lists of
 new and updated files, deletes files and directories which no longer exist on
 the server, and passes one combined list to rsync via --files-from.  Because
 all modules are copied together, hardlinks between modules will be copied as
-hardlinks.
+hardlinks.  Files and directories which no longer exist on the server are
+deleted after the copy has completed, similar to the ``--delete-delay`` option
+to ``rsync``.
 
-The speed improvements can be extraordinary.
+The speed improvements can be extraordinary.  Just the "receiving file list"
+phase of a mirror of ``fedora-buffet`` can take over ten hours and places a
+huge load on the host from which you're downloading.  With this script it takes
+six seconds.
 
 Installation
 ------------
@@ -56,9 +61,10 @@ Options
 -------
 
 -a
-    Always check the file list.  This disables the optimization which doesn't
-    process the file list if it hasn't changed from the local copy.
-    Useful if you believe that some files have gone missing Configuratio
+    Always check the file list.  This disables the optimization in which the
+    file list isn't processed at all if it hasn't changed from the local copy.
+    Useful if you believe that some files have gone missing from your
+    repository and you want to force them to be fetched.
 
 -c
     Configuration file to use.
@@ -68,13 +74,14 @@ Options
     file for details.
 
 -t
-    Instead of the previous run time, use this.  Should be an integer
-    representing the seconds since the epoch.
+    Instead of the previous run time, use this many seconds since the epoch.
+    Implies ``-a``.
 
 -T
     Instead of the previous run time, use this.  The value is passed to ``date
     -d``, so it should be in a format which date recognizes.  ``yesterday`` and
-    ``last week`` are useful.  Remember to quote if there are spaces.
+    ``last week`` are useful examples.  Remember to quote if there are spaces.
+    Implies ``-a``.
 
 Initial Run
 -----------
@@ -120,8 +127,6 @@ course, that it is called with ``-H``).
 The format of the file list is simple enough to be parsed by a shell script
 with a few calls to awk.
 
-Be sure to run ``create-filelist`` after every repository change.
-
 Downstream Mirrors
 ==================
 
@@ -131,6 +136,26 @@ mirrors should *not* modify the filelists.
 Assuming ``rsync`` is called with --delay-updates, downstream mirrors should
 always have a consistent view of the repository.  Changes should get out very
 quickly, because mirrors can poll frequently without overloading servers.
+
+Non-Fedora Usage
+================
+Note that you can of course run the server component in your own repository,
+but the clients will of course need to specify ``REMOTE``, ``MASTERMODULE`` and
+the ``MODULES`` array to map module names to directories.  The client also the
+assumption that all of the separate module are included in a master module.  If
+you would like to use this code but those constraints don't fit your use case,
+please file an issue and I'll be happy to take a look.
+
+Be sure to run ``create-filelist`` after every repository change.  You can also
+run it from cron, but clients may see the repository in an inconsistent state
+in the interval between the changes and the file list generation.  This will
+not result in any repository corruption, though; clients will pick up the
+correct repository state on the next run.
+
+It's a good idea to run a diff or something and only copy the output into place
+if the new output differs.  Technically ``create-filelist`` could just do this,
+but it is currently easy to integrate into whatever script or arrangement you
+might have in place.
 
 Authorship and License
 ======================
