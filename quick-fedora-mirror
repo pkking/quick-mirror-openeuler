@@ -19,7 +19,7 @@ starttime=$(($starttime-5))
 db () { (( VERBOSE >= 2 )) && echo '>>' $* }
 db2 () { (( VERBOSE >= 3 )) && echo '>>>>' $* }
 db3 () { (( VERBOSE >= 4 )) && echo '>>>>>>' $* }
-sep () { (( VERBOSE >= 1 )) && echo '============================================================' }
+sep () { (( VERBOSE >= 2 )) && echo '============================================================' }
 
 finish () {
     if (( $VERBOSE >= 1 )); then
@@ -30,11 +30,10 @@ finish () {
 }
 
 # Parse args
-while [[ $# > 1 ]]; do
+while [[ $# > 0 ]]; do
     opt=$1
     case $opt in
         -a)
-            echo Always doing full checking.
             alwayscheck=1
             ;;
         -c)
@@ -51,10 +50,12 @@ while [[ $# > 1 ]]; do
             ;;
         -t)
             backdate=$2
+            alwayscheck=1
             shift
             ;;
         -T)
             backdate=$(date -d "$2" +%s)
+            alwayscheck=1
             shift
             ;;
         *)
@@ -162,9 +163,9 @@ case $VERBOSE in
         ;&
     3)
         ;&
-    2)  echo -n 'Mirror starting: '; date; echo
+    2)  echo -n 'Mirror starting: '; date
         ;;
-    1)  echo -n 'Mirror starting: '; date; echo
+    1)  echo -n 'Mirror starting: '; date
         ;&
     0)  RSYNCOPTS+=(-q)
         ;;
@@ -228,14 +229,14 @@ for module in $MODULES; do
 
     # We always want to transfer the file list itself in the transaction.
     echo $moduledir/$FILELIST >> newfiles-$module
-    cat newfiles-$module >> transferlist
+    cat newfiles-$module >> master-transferlist
     totallines=$((totallines+linecount))
 
     # Dirs on the werver which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
     linecount=$(wc -l < newdirs-$module)
     db2 Found $linecount new or updated dirs in $module since last run.
-    cat newdirs-$module >> transferlist
+    cat newdirs-$module >> master-transferlist
     totallines=$((totallines+linecount))
 
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
@@ -259,23 +260,17 @@ for module in $MODULES; do
         linecount=$(wc -l < localdirs-$module)
         db2 Found $linecount local dirs in $module.
 
-        # Computes the set difference between the first file and the third.
+        # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
         linecount=$(wc -l < deletedirs-$module)
-        # XXX push these deletes down until after the big rsync run
-        db ++ Recursively removing $linecount stale dirs from $moduledir.
-        for nuke in $(cat deletedirs-$module); do
-            if [[ -d "$DESTD/$nuke" ]]; then
-                db3 Removing $nuke
-                rm -rf "$DESTD/$nuke"
-            fi
-        done
+        db ++ Will remove $linecount stale dirs from $moduledir.
+        cat deletedirs-$module >> master-deletedirs
 
         # Find dirs on the server which are missing on the client
         sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
         linecount=$(wc -l < missingdirs-$module)
         db2 Found $linecount missing dirs in $module.
-        cat missingdirs-$module >> transferlist
+        cat missingdirs-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
         db ++ Generating local file lists
@@ -283,51 +278,43 @@ for module in $MODULES; do
         echo find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         popd
-
         linecount=$(wc -l < localfiles-$module)
         db2 Found $linecount local files in $module.
 
-
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
         linecount=$(wc -l < deletefiles-$module)
-        # XXX push these deletes down until after the big rsync run
-        db ++ Removing $linecount stale files from $module.
-        for nuke in $(cat deletefiles-$module); do
-            if [[ -f "$nuke" || -h "$nuke" ]]; then
-                db3 Removing $nuke
-                rm -f "$DESTD/$nuke"
-            fi
-        done
+        db ++ Will remove $linecount stale files from $module.
+        cat deletefiles-$module >> master-deletefiles
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
         linecount=$(wc -l < missingfiles-$module)
         db2 Found $linecount missing files in $module.
-        cat missingfiles-$module >> transferlist
+        cat missingfiles-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
     fi
     db Finished processing.  Added $totallines files and dirs to the transfer list.
 done
 
-if [[ ! -e transferlist ]]; then
+if [[ ! -e master-transferlist ]]; then
     db No changed files.
     finish
 fi
 
 # rsync prefers sorted file lists and will complain if there are duplicates
-sort -u transferlist > transferlist.sorted
-linecount=$(wc -l < transferlist.sorted)
+sort -u master-transferlist > master-transferlist.sorted
+linecount=$(wc -l < master-transferlist.sorted)
 sep; sep
 db Beginning transfer of $linecount files.
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db2 $RSYNC $RSYNCOPTS files-from transferlist.sorted $REMOTE $DESTD
+db2 $RSYNC $RSYNCOPTS files-from master-transferlist.sorted $REMOTE $DESTD
 sleep=1
 while true; do
-    $RSYNC $RSYNCOPTS --files-from transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+    $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
     rsyncreturn=$?
     (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
     db rsync failed: sleeping for $sleep
@@ -339,9 +326,33 @@ while true; do
     fi
 done
 
-mv $TIMEFILE $TIMEFILE.prev
+if [[ -s master-deletedirs ]]; then
+    db Removing stale directories.
+    for nuke in $(cat master-deletedirs); do
+        if [[ -d "$DESTD/$nuke" ]]; then
+            db3 Removing $nuke
+            rm -rf "$DESTD/$nuke"
+        fi
+    done
+fi
+
+# If we had deleted the directories before making the list of stale files, we
+# could save a lot of work here.  But since we have to delay the process, most
+# of these will probably have been deleted above.
+if [[ -s master-deletefiles ]]; then
+    db Removing stale files.
+    for nuke in $(cat master-deletefiles); do
+        if [[ -f "$nuke" || -h "$nuke" ]]; then
+            db3 Removing $nuke
+            rm -f "$DESTD/$nuke"
+        fi
+    done
+fi
 
 db Saving mirror time to $TIMEFILE
+if [[ -e $TIMEFILE ]]; then
+    mv $TIMEFILE $TIMEFILE.prev
+fi
 echo LASTTIME=$starttime > $TIMEFILE
 
 if (( ? != 0 )); then
