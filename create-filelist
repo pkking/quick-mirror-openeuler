@@ -7,7 +7,6 @@
 # Donated to the public domain.  If you require a statement of license, please
 # consider this work to be licensed as "CC0 Universal", any version you choose.
 
-
 from scandir import scandir
 
 
@@ -33,4 +32,4 @@ for entry in recursedir('.'):
     info = entry.stat(follow_symlinks=False)
     modtime = max(info.st_mtime, info.st_ctime)
     ftype = get_ftype(entry)
-    print('{} {} {}'.format(modtime, ftype, entry.path[2:]))
+    print('{0:<10} {1} {2}'.format(modtime, ftype, entry.path[2:]))
