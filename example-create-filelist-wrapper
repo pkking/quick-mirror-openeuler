@@ -1,21 +1,27 @@
 #!/bin/sh
 
-TOPD=/pub
+TOPD=test-dest
 FILELIST=fullfiletimelist
+LOCKFILE=.lock.$FILELIST
+CREATE=/usr/local/bin/create-filelist
 
 MOD=$1
 [ -z "$MOD" ] && {
     echo "usage: $0 <module>"
-    exit 1
+    exit 2
 }
 
-TMPFILE=$(mktemp -p /tmp/)
-pushd $TOPD/$MOD > /dev/null
-create-filelist . > $TMPFILE
-if diff $TMPFILE $FILELIST > /dev/null; then
-    rm -f $TMPFILE
-else
-    mv $TMPFILE fullfiletimelist
-fi
-chmod 0644 fullfiletimelist
-popd > /dev/null
+(
+    flock -n 9 || exit 1
+
+    TMPFILE=$(mktemp -p /tmp/)
+    pushd $TOPD/$MOD > /dev/null
+    $CREATE . > $TMPFILE
+    if diff $TMPFILE $FILELIST > /dev/null; then
+        rm -f $TMPFILE
+    else
+        mv $TMPFILE fullfiletimelist
+    fi
+    chmod 0644 fullfiletimelist
+    popd > /dev/null
+) 9>$LOCKFILE
