@@ -16,9 +16,10 @@ starttime=$(($starttime-5))
 
 # Utility functions
 
-db () { (( VERBOSE >= 2 )) && echo '>>' $* }
-db2 () { (( VERBOSE >= 3 )) && echo '>>>>' $* }
-db3 () { (( VERBOSE >= 4 )) && echo '>>>>>>' $* }
+db () { (( VERBOSE >= 1 )) && echo '>>' $* }
+db2 () { (( VERBOSE >= 2 )) && echo '>>>>' $* }
+db3 () { (( VERBOSE >= 3 )) && echo '>>>>>>' $* }
+db4 () { (( VERBOSE >= 4 )) && echo '>>>>>>>>' $* }
 sep () { (( VERBOSE >= 2 )) && echo '============================================================' }
 
 finish () {
@@ -28,6 +29,56 @@ finish () {
     fi
     exit 0
 }
+
+do_rsync () {
+    # Needs three options: source, destination and the name of an array
+    # containing additional options.  If rsync fails, this will sleep with
+    # exponential backoff ten times, and then will exit the script.
+    local src=$1
+    local dest=$2
+    local opts=$3
+    local sleep=1
+    while true; do
+        # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
+        # broken array handling.   bash 4.3 has local -n for this.  Older bash
+        # needs hacks, or eval.  More info:
+        # https://stackoverflow.com/questions/1063347/passing-arrays-as-parameters-in-bash
+        # Or just use a freaking global.
+
+        # Redirect to files based on VERBOSE
+        # 0 - stdout and stderr redirected; dump stderr at end after ten tries
+        # 1 - stdout redirected; stderr not redirected
+        # 2 - Only some of stdout (the summar line at the end of the transfer)
+        # 5 - Now start showing more output.  What to show?
+        if (( VERBOSE >= 5 )); then
+            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest
+            $RSYNC $RSYNCOPTS ${(P)src} $src $dest
+        elif (( VERBOSE >= 2 )); then
+            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log
+            $RSYNC $RSYNCOPTS ${(P)src} $src $dest
+
+        fi
+        rsyncreturn=$?
+
+        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
+
+        if (( VERBOSE >= 1 )); then
+            (>&2 cat $errlog)
+            rm $errlog
+        fi
+
+        db2 rsync failed: sleeping for $sleep
+        sleep $sleep
+        sleep=$(( sleep*2 ))
+        if (( sleep > 1000 )); then
+            (>&2 echo "Could not sync from $REMOTE/$module")
+            (>&2 cat $errlog)
+            exit 1
+        fi
+
+    done
+}
+
 
 # Parse args
 while [[ $# > 0 ]]; do
@@ -182,7 +233,7 @@ fi
 # transferred from all of the modules
 for module in $MODULES; do
     sep
-    db Processing $module
+    db2 Processing $module
 
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
@@ -197,35 +248,35 @@ for module in $MODULES; do
         filelisttime=$(stat --format=%Y $FILELIST)
     fi
 
+    do_rsync $REMOTE/$module/$FILELIST . rsync-$module rsync-err-$module
 
-    db2 $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    sleep=1
-    while true; do
-        $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-        rsyncreturn=$?
-        # rsync will return 5 if the host says it's too busy, and 10 if the
-        # connection was refused or the host doesn't resolve.
-        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-        db rsync failed: sleeping for $sleep
-        sleep $sleep
-        sleep=$(( sleep*2 ))
-        if (( sleep > 1000 )); then
-            (>&2 echo "Could not sync $REMOTE/$module/$FILELIST")
-            exit 1
-        fi
-    done
+    #sleep=1
+    #while true; do
+    #    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
+    #    rsyncreturn=$?
+    #    # rsync will return 5 if the host says it's too busy, and 10 if the
+    #    # connection was refused or the host doesn't resolve.
+    #    (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
+    #    db2 rsync failed: sleeping for $sleep
+    #    sleep $sleep
+    #    sleep=$(( sleep*2 ))
+    #    if (( sleep > 1000 )); then
+    #        (>&2 echo "Could not sync $REMOTE/$module/$FILELIST")
+    #        exit 1
+    #    fi
+    #done
 
     if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
-        db No change in file list mtime.  Skipping $module.
+        db2 No change in file list mtime.  Skipping $module.
         continue
     fi
 
-    db ++ Extracting lists
+    db2 ++ Extracting lists
 
     # Get files on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newfiles-$module
     linecount=$(wc -l < newfiles-$module)
-    db2 Found $linecount new or updated files in $module since last run.
+    db3 Found $linecount new or updated files in $module since last run.
 
     # We always want to transfer the file list itself in the transaction.
     echo $moduledir/$FILELIST >> newfiles-$module
@@ -235,72 +286,72 @@ for module in $MODULES; do
     # Dirs on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
     linecount=$(wc -l < newdirs-$module)
-    db2 Found $linecount new or updated dirs in $module since last run.
+    db3 Found $linecount new or updated dirs in $module since last run.
     cat newdirs-$module >> master-transferlist
     totallines=$((totallines+linecount))
 
     # Get a list of all files which should be in the repository
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
     linecount=$(wc -l < allfiles-$module)
-    db2 Found $linecount remote files in $module.
+    db3 Found $linecount remote files in $module.
 
     # Get a list of all of the directories which should be in the repository
     awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > alldirs-$module
     linecount=$(wc -l < alldirs-$module)
-    db2 Found $linecount remote dirs in $module.
+    db3 Found $linecount remote dirs in $module.
 
     # We want to delete any files, symlinks or directories  which exist locally
     # but which don't exist on the server.  If we do this here, before the
     # transfer, the directory mtimes will be correct after the transfer.
     if [[ -d $DESTD/$moduledir ]]; then
-        db ++ Generating local dir lists
+        db2 ++ Generating local dir lists
         pushd $DESTD
         find $moduledir/* -type d > $tempd/localdirs-$module
         popd
 
         linecount=$(wc -l < localdirs-$module)
-        db2 Found $linecount local dirs in $module.
+        db3 Found $linecount local dirs in $module.
 
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
         linecount=$(wc -l < deletedirs-$module)
-        db ++ Will remove $linecount stale dirs from $moduledir.
+        db2 ++ Will remove $linecount stale dirs from $moduledir.
         cat deletedirs-$module >> master-deletedirs
 
         # Find dirs on the server which are missing on the client
         sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
         linecount=$(wc -l < missingdirs-$module)
-        db2 Found $linecount missing dirs in $module.
+        db3 Found $linecount missing dirs in $module.
         cat missingdirs-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
-        db ++ Generating local file lists
+        db2 ++ Generating local file lists
         pushd $DESTD
-        db3 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
+        db4 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
         find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         popd
         linecount=$(wc -l < localfiles-$module)
-        db2 Found $linecount local files in $module.
+        db3 Found $linecount local files in $module.
 
-	# Find files on the client which don't exist on the server
+        # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
         linecount=$(wc -l < deletefiles-$module)
-        db ++ Will remove $linecount stale files from $module.
+        db2 ++ Will remove $linecount stale files from $module.
         cat deletefiles-$module >> master-deletefiles
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
         linecount=$(wc -l < missingfiles-$module)
-        db2 Found $linecount missing files in $module.
+        db3 Found $linecount missing files in $module.
         cat missingfiles-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
     fi
-    db Finished processing.  Added $totallines files and dirs to the transfer list.
+    db2 Finished processing.  Added $totallines files and dirs to the transfer list.
 done
 
 if [[ ! -e master-transferlist ]]; then
-    db No changed files.
+    db2 No changed files.
     finish
 fi
 
@@ -308,18 +359,18 @@ fi
 sort -u master-transferlist > master-transferlist.sorted
 linecount=$(wc -l < master-transferlist.sorted)
 sep; sep
-db Beginning transfer of $linecount files.
+db2 Beginning transfer of $linecount files.
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db2 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
 sleep=1
 while true; do
     $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
     rsyncreturn=$?
     (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-    db rsync failed: sleeping for $sleep
+    db2 rsync failed: sleeping for $sleep
     sleep $sleep
     sleep=$(( sleep*2 ))
     if (( sleep > 1000 )); then
@@ -329,10 +380,10 @@ while true; do
 done
 
 if [[ -s master-deletedirs ]]; then
-    db Removing stale directories.
+    db2 Removing stale directories.
     for nuke in $(cat master-deletedirs); do
         if [[ -d "$DESTD/$nuke" ]]; then
-            db3 Removing $nuke
+            db4 Removing $nuke
             rm -rf "$DESTD/$nuke"
         fi
     done
@@ -342,16 +393,16 @@ fi
 # could save a lot of work here.  But since we have to delay the process, most
 # of these will probably have been deleted above.
 if [[ -s master-deletefiles ]]; then
-    db Removing stale files.
+    db2 Removing stale files.
     for nuke in $(cat master-deletefiles); do
         if [[ -f "$nuke" || -h "$nuke" ]]; then
-            db3 Removing $nuke
+            db4 Removing $nuke
             rm -f "$DESTD/$nuke"
         fi
     done
 fi
 
-db Saving mirror time to $TIMEFILE
+db2 Saving mirror time to $TIMEFILE
 if [[ -e $TIMEFILE ]]; then
     mv $TIMEFILE $TIMEFILE.prev
 fi
