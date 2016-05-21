@@ -73,6 +73,10 @@ Options
     Set output verbosity.  See the VERBOSE setting in the sample configuration
     file for details.
 
+-n
+    Dry run.  Don't transfer or delete any content or update the timestamp.
+    Note: the master is still contacted to download the file lists.
+
 -t
     Instead of the previous run time, use this many seconds since the epoch.
     Implies ``-a``.
