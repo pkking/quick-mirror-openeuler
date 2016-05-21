@@ -31,13 +31,17 @@ finish () {
 }
 
 do_rsync () {
-    # Needs three options: source, destination and the name of an array
-    # containing additional options.  If rsync fails, this will sleep with
+    # Options: source, destination.
+    # The name of an array containing additional options.
+    # If rsync fails, this will sleep with
     # exponential backoff ten times, and then will exit the script.
     local src=$1
     local dest=$2
     local opts=$3
     local sleep=1
+    local log=rsync.log
+    local errlog=rsync-error.log
+
     while true; do
         # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
         # broken array handling.   bash 4.3 has local -n for this.  Older bash
@@ -48,15 +52,20 @@ do_rsync () {
         # Redirect to files based on VERBOSE
         # 0 - stdout and stderr redirected; dump stderr at end after ten tries
         # 1 - stdout redirected; stderr not redirected
-        # 2 - Only some of stdout (the summar line at the end of the transfer)
+        # 2 - Only some of stdout (the summary line at the end of the transfer)
         # 5 - Now start showing more output.  What to show?
         if (( VERBOSE >= 5 )); then
             db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest
             $RSYNC $RSYNCOPTS ${(P)src} $src $dest
         elif (( VERBOSE >= 2 )); then
             db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log
-            $RSYNC $RSYNCOPTS ${(P)src} $src $dest
-
+            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log
+        elif (( VERBOSE == 1 )); then
+            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log >> $log 2>> $errlog
+        else
+            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log >> $log 2>> $errlog
         fi
         rsyncreturn=$?
 
@@ -72,13 +81,13 @@ do_rsync () {
         sleep=$(( sleep*2 ))
         if (( sleep > 1000 )); then
             (>&2 echo "Could not sync from $REMOTE/$module")
-            (>&2 cat $errlog)
+            [[ -f $errlog ]] && (>&2 cat $errlog)
             exit 1
         fi
-
     done
-}
 
+    # If we got here, we have a successful run.
+}
 
 # Parse args
 while [[ $# > 0 ]]; do
@@ -98,6 +107,9 @@ while [[ $# > 0 ]]; do
         -d)
             verboseopt=$2
             shift
+            ;;
+        -n)
+            dryrun=1
             ;;
         -t)
             backdate=$2
@@ -138,8 +150,13 @@ REMOTE=rsync://dl.fedoraproject.org
 FILELIST=fullfiletimelist
 
 RSYNC=/usr/bin/rsync
-#ZSHISM? (initialize array with unsplit args)
-RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --preallocate --fuzzy --delete-delay --delay-updates)
+
+rsyncver=$(rsync --version | head -1 | awk '{print $3}')
+if [[ $rsyncver == 3.1* ]]; then
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --preallocate --fuzzy --delete-delay --delay-updates)
+else
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --fuzzy --delete-delay --delay-updates)
+fi
 
 MASTERMODULE=fedora-buffet
 MIRRORBUFFET=0
@@ -208,6 +225,7 @@ case $VERBOSE in
         echo MODULEMAPPING=$MODULEMAPPING
         echo
         ;&
+    # These should move to the function which calls rsync
     5)  RSYNCOPTS+=(-v)
         ;&
     4)  RSYNCOPTS+=(-v)
@@ -249,22 +267,6 @@ for module in $MODULES; do
     fi
 
     do_rsync $REMOTE/$module/$FILELIST . rsync-$module rsync-err-$module
-
-    #sleep=1
-    #while true; do
-    #    $RSYNC $RSYNCOPTS $REMOTE/$module/$FILELIST .
-    #    rsyncreturn=$?
-    #    # rsync will return 5 if the host says it's too busy, and 10 if the
-    #    # connection was refused or the host doesn't resolve.
-    #    (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-    #    db2 rsync failed: sleeping for $sleep
-    #    sleep $sleep
-    #    sleep=$(( sleep*2 ))
-    #    if (( sleep > 1000 )); then
-    #        (>&2 echo "Could not sync $REMOTE/$module/$FILELIST")
-    #        exit 1
-    #    fi
-    #done
 
     if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
         db2 No change in file list mtime.  Skipping $module.
@@ -366,51 +368,77 @@ db2 Beginning transfer of $linecount files.
 # the changed files without having to pull the entire huge file list.
 db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
 sleep=1
-while true; do
-    $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
-    rsyncreturn=$?
-    (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-    db2 rsync failed: sleeping for $sleep
-    sleep $sleep
-    sleep=$(( sleep*2 ))
-    if (( sleep > 1000 )); then
-        (>&2 echo "Could not sync files from $REMOTE/$module")
-        exit 1
-    fi
-done
-
-if [[ -s master-deletedirs ]]; then
-    db2 Removing stale directories.
-    for nuke in $(cat master-deletedirs); do
-        if [[ -d "$DESTD/$nuke" ]]; then
-            db4 Removing $nuke
-            #rm -rf "$DESTD/$nuke"
+if [[ -n $dryrun ]]; then
+    echo Dry run specified.  Not calling rsync.
+else
+    while true; do
+        $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+        rsyncreturn=$?
+        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
+        db2 rsync failed: sleeping for $sleep
+        sleep $sleep
+        sleep=$(( sleep*2 ))
+        if (( sleep > 1000 )); then
+            (>&2 echo "Could not sync files from $REMOTE/$module")
+            exit 1
         fi
     done
+fi
+
+if [[ -s master-deletedirs ]]; then
+    linecount=$(wc -l < master-deletedirs)
+
+    if [[ -n $dryrun ]]; then
+        echo Not deleting  $linecount directories.  Delete list is:
+        cat master-deletedirs
+    else
+        db2 Removing $linecount stale directories.
+        for nuke in $(cat master-deletedirs); do
+            db4 Checking $DESTD/$nuke
+            if [[ -d "$DESTD/$nuke" ]]; then
+                db4 Removing $nuke
+                rm -rf "$DESTD/$nuke"
+            fi
+        done
+    fi
+else
+    db2 No stale directories to delete.
 fi
 
 # If we had deleted the directories before making the list of stale files, we
 # could save a lot of work here.  But since we have to delay the process, most
 # of these will probably have been deleted above.
 if [[ -s master-deletefiles ]]; then
-    db2 Removing stale files.
-    for nuke in $(cat master-deletefiles); do
-        if [[ -f "$nuke" || -h "$nuke" ]]; then
-            db4 Removing $nuke
-            #rm -f "$DESTD/$nuke"
-        fi
-    done
+    linecount=$(wc -l < master-deletefiles)
+
+    if [[ -n $dryrun ]]; then
+        echo Not deleting $linecount stale files.  Delete list is:
+        cat master-deletefiles
+    else
+        db2 Removing $linecount stale files.
+        for nuke in $(cat master-deletefiles); do
+            if [[ -f "$DESTD/$nuke" || -h "$DESTD/$nuke" ]]; then
+                db4 Removing $nuke
+                rm -f "$DESTD/$nuke"
+            fi
+        done
+    fi
+else
+    db2 No stale files to delete.
 fi
 
-db2 Saving mirror time to $TIMEFILE
-if [[ -e $TIMEFILE ]]; then
-    mv $TIMEFILE $TIMEFILE.prev
-fi
-echo LASTTIME=$starttime > $TIMEFILE
 
-if (( ? != 0 )); then
-    (>&2 echo Problem saving timestamp file $TIMEFILE)
-    exit 1
+if [[ -n $dryrun ]]; then
+    db2 Saving mirror time to $TIMEFILE
+    if [[ -e $TIMEFILE ]]; then
+        mv $TIMEFILE $TIMEFILE.prev
+    fi
+    echo LASTTIME=$starttime > $TIMEFILE
+
+    if (( ? != 0 )); then
+        (>&2 echo Problem saving timestamp file $TIMEFILE)
+        exit 1
+    fi
 fi
 
 finish
