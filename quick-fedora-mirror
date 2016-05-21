@@ -384,7 +384,7 @@ if [[ -s master-deletedirs ]]; then
     for nuke in $(cat master-deletedirs); do
         if [[ -d "$DESTD/$nuke" ]]; then
             db4 Removing $nuke
-            rm -rf "$DESTD/$nuke"
+            #rm -rf "$DESTD/$nuke"
         fi
     done
 fi
@@ -397,7 +397,7 @@ if [[ -s master-deletefiles ]]; then
     for nuke in $(cat master-deletefiles); do
         if [[ -f "$nuke" || -h "$nuke" ]]; then
             db4 Removing $nuke
-            rm -f "$DESTD/$nuke"
+            #rm -f "$DESTD/$nuke"
         fi
     done
 fi
