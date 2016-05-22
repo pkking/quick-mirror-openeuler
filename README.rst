@@ -77,6 +77,10 @@ Options
     Dry run.  Don't transfer or delete any content or update the timestamp.
     Note: the master is still contacted to download the file lists.
 
+-N
+    Partial dry run.  Ask rsync to do a normal transfer, but don't delete any
+    local files which are not present in the file list.
+
 -t
     Instead of the previous run time, use this many seconds since the epoch.
     Implies ``-a``.

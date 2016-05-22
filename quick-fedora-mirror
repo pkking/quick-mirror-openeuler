@@ -109,7 +109,11 @@ while [[ $# > 0 ]]; do
             shift
             ;;
         -n)
-            dryrun=1
+            skiprsync=1
+            skipdelete=1
+            ;;
+        -N)
+            skipdelete=1
             ;;
         -t)
             backdate=$2
@@ -368,7 +372,7 @@ db2 Beginning transfer of $linecount files.
 # the changed files without having to pull the entire huge file list.
 db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
 sleep=1
-if [[ -n $dryrun ]]; then
+if [[ -n $skiprsync ]]; then
     echo Dry run specified.  Not calling rsync.
 else
     while true; do
@@ -388,7 +392,7 @@ fi
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
 
-    if [[ -n $dryrun ]]; then
+    if [[ -n $skipdelete ]]; then
         echo Not deleting  $linecount directories.  Delete list is:
         cat master-deletedirs
     else
@@ -411,16 +415,14 @@ fi
 if [[ -s master-deletefiles ]]; then
     linecount=$(wc -l < master-deletefiles)
 
-    if [[ -n $dryrun ]]; then
+    if [[ -n $skipdelete ]]; then
         echo Not deleting $linecount stale files.  Delete list is:
         cat master-deletefiles
     else
         db2 Removing $linecount stale files.
         for nuke in $(cat master-deletefiles); do
-            if [[ -f "$DESTD/$nuke" || -h "$DESTD/$nuke" ]]; then
-                db4 Removing $nuke
-                rm -f "$DESTD/$nuke"
-            fi
+            db4 Removing $nuke
+            rm -f "$DESTD/$nuke"
         done
     fi
 else
@@ -428,7 +430,7 @@ else
 fi
 
 
-if [[ -n $dryrun ]]; then
+if [[ -n $skipdelete ]]; then
     db2 Saving mirror time to $TIMEFILE
     if [[ -e $TIMEFILE ]]; then
         mv $TIMEFILE $TIMEFILE.prev
