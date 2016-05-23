@@ -381,27 +381,6 @@ db2 Beginning transfer of $linecount files.
 extra=(--files-from master-transferlist.sorted)
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD extra
 
-
-#db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
-#sleep=1
-#if [[ -n $skiprsync ]]; then
-    #echo Dry run specified.  Not calling rsync.
-#else
-     XXX Replace this with do_rsync.
-    #while true; do
-        #$RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
-        #rsyncreturn=$?
-        #(( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-        #db2 rsync failed: sleeping for $sleep
-        #sleep $sleep
-        #sleep=$(( sleep*2 ))
-        #if (( sleep > 1000 )); then
-            #(>&2 echo "Could not sync files from $REMOTE/$module")
-            #exit 1
-        #fi
-    #done
-#fi
-
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
 
