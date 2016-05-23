@@ -71,7 +71,7 @@ do_rsync () {
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
-        if (( VERBOSE >= 1 )); then
+        if [[ $VERBOSE -gt 1 && -f $errlog ]]; then
             (>&2 cat $errlog)
             rm $errlog
         fi
@@ -306,11 +306,9 @@ for module in $MODULES; do
     linecount=$(wc -l < alldirs-$module)
     db3 Found $linecount remote dirs in $module.
 
-    # We want to delete any files, symlinks or directories  which exist locally
-    # but which don't exist on the server.  If we do this here, before the
-    # transfer, the directory mtimes will be correct after the transfer.
+    # XXX reorder these to make more intelligent debugging output
     if [[ -d $DESTD/$moduledir ]]; then
-        db2 ++ Generating local dir lists
+        db4 ++ Generating local dir lists
         pushd $DESTD
         find $moduledir/* -type d > $tempd/localdirs-$module
         popd
@@ -321,7 +319,7 @@ for module in $MODULES; do
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
         linecount=$(wc -l < deletedirs-$module)
-        db2 ++ Will remove $linecount stale dirs from $moduledir.
+        db3 ++ Will remove $linecount stale dirs from $moduledir.
         cat deletedirs-$module >> master-deletedirs
 
         # Find dirs on the server which are missing on the client
@@ -331,7 +329,7 @@ for module in $MODULES; do
         cat missingdirs-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
-        db2 ++ Generating local file lists
+        db4 ++ Generating local file lists
         pushd $DESTD
         db4 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
         find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
@@ -421,6 +419,9 @@ if [[ -s master-deletefiles ]]; then
     else
         db2 Removing $linecount stale files.
         for nuke in $(cat master-deletefiles); do
+            # Use xargs here to speed things up
+            # (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles
+            # At least, I think that works OK.
             db4 Removing $nuke
             rm -f "$DESTD/$nuke"
         done
@@ -430,7 +431,7 @@ else
 fi
 
 
-if [[ -n $skipdelete ]]; then
+if [[ -z $skipdelete ]]; then
     db2 Saving mirror time to $TIMEFILE
     if [[ -e $TIMEFILE ]]; then
         mv $TIMEFILE $TIMEFILE.prev
@@ -441,6 +442,8 @@ if [[ -n $skipdelete ]]; then
         (>&2 echo Problem saving timestamp file $TIMEFILE)
         exit 1
     fi
+else
+    db2 Skipping timestamp save.
 fi
 
 finish
