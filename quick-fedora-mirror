@@ -34,7 +34,8 @@ do_rsync () {
     # Options: source, destination.
     # The name of an array containing additional options.
     # If rsync fails, this will sleep with
-    # exponential backoff ten times, and then will exit the script.
+    # exponential backoff ten times, and then will exit the script (not just
+    # the function).
     local src=$1
     local dest=$2
     local opts=$3
@@ -55,17 +56,17 @@ do_rsync () {
         # 2 - Only some of stdout (the summary line at the end of the transfer)
         # 5 - Now start showing more output.  What to show?
         if (( VERBOSE >= 5 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest
-            $RSYNC $RSYNCOPTS ${(P)src} $src $dest
+            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest
+            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest
         elif (( VERBOSE >= 2 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log
-            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log
+            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log
+            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log
         elif (( VERBOSE == 1 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log >> $log 2>> $errlog
+            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
         else
-            db Calling $RSYNC $RSYNCOPTS ${(P)src} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS ${(P)src} $src $dest >> $log >> $log 2>> $errlog
+            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
         fi
         rsyncreturn=$?
 
@@ -157,9 +158,9 @@ RSYNC=/usr/bin/rsync
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --preallocate --fuzzy --delete-delay --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delete-delay --delay-updates)
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --dirs --fuzzy --delete-delay --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delete-delay --delay-updates)
 fi
 
 MASTERMODULE=fedora-buffet
@@ -279,7 +280,7 @@ for module in $MODULES; do
         filelisttime=$(stat --format=%Y $FILELIST)
     fi
 
-    do_rsync $REMOTE/$module/$FILELIST . rsync-$module rsync-err-$module
+    do_rsync $REMOTE/$module/$FILELIST . #rsync-$module rsync-err-$module
 
     if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
         db2 No change in file list mtime.  Skipping $module.
@@ -377,25 +378,29 @@ db2 Beginning transfer of $linecount files.
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
-sleep=1
-if [[ -n $skiprsync ]]; then
-    echo Dry run specified.  Not calling rsync.
-else
-    # XXX Replace this with do_rsync.
-    while true; do
-        $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
-        rsyncreturn=$?
-        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-        db2 rsync failed: sleeping for $sleep
-        sleep $sleep
-        sleep=$(( sleep*2 ))
-        if (( sleep > 1000 )); then
-            (>&2 echo "Could not sync files from $REMOTE/$module")
-            exit 1
-        fi
-    done
-fi
+extra=(--files-from master-transferlist.sorted)
+do_rsync $REMOTE/$MASTERMODULE/ $DESTD extra
+
+
+#db3 $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+#sleep=1
+#if [[ -n $skiprsync ]]; then
+    #echo Dry run specified.  Not calling rsync.
+#else
+     XXX Replace this with do_rsync.
+    #while true; do
+        #$RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
+        #rsyncreturn=$?
+        #(( rsyncreturn != 5 && rsyncreturn != 10 )) && break
+        #db2 rsync failed: sleeping for $sleep
+        #sleep $sleep
+        #sleep=$(( sleep*2 ))
+        #if (( sleep > 1000 )); then
+            #(>&2 echo "Could not sync files from $REMOTE/$module")
+            #exit 1
+        #fi
+    #done
+#fi
 
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
