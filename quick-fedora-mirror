@@ -237,8 +237,10 @@ case $VERBOSE in
     3)
         ;&
     2)  echo -n 'Mirror starting: '; date
+        RSYNCOPTS+=(--no-motd)
         ;;
     1)  echo -n 'Mirror starting: '; date
+        RSYNCOPTS+=(--no-motd)
         ;&
     0)  RSYNCOPTS+=(-q)
         ;;
@@ -373,6 +375,7 @@ sleep=1
 if [[ -n $skiprsync ]]; then
     echo Dry run specified.  Not calling rsync.
 else
+    # XXX Replace this with do_rsync.
     while true; do
         $RSYNC $RSYNCOPTS --files-from master-transferlist.sorted $REMOTE/$MASTERMODULE/ $DESTD
         rsyncreturn=$?
