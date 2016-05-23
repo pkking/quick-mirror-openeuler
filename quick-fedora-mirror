@@ -201,50 +201,57 @@ tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
 trap "rm -rf $tempd" EXIT
 cd $tempd
 
-# Modify RSYNCOPTS based on verbosity
-# ZSHISM? (;& explicit case fallthrough)
+# Spit out some extra information
 case $VERBOSE in
     8)
-        echo Loads of debugging.
-        set -x
         ;&
     7)
         RSYNCOPTS+=(--progress)
         ;&
     6)
-        echo Times:
-        echo LASTTIME=$LASTTIME
-        echo starttime=$starttime
-        echo TIMEFILE=$TIMEFILE
-        echo Dirs:
-        echo tempd=$tempd
-        echo DESTD=$DESTD
-        echo Rsync:
-        echo REMOTE=$REMOTE
-        echo MASTERMODULE=$MASTERMODULE
-        echo RSYNC=$RSYNC
-        echo RSYNCOPTS=$RSYNCOPTS
-        echo Modules:
-        echo MODULES=$MODULES
-        echo MODULEMAPPING=$MODULEMAPPING
-        echo
         ;&
-    # These should move to the function which calls rsync
     5)  RSYNCOPTS+=(-v)
         ;&
     4)  RSYNCOPTS+=(-v)
         ;&
     3)
-        ;&
-    2)  echo -n 'Mirror starting: '; date
         RSYNCOPTS+=(--no-motd)
         ;;
-    1)  echo -n 'Mirror starting: '; date
-        RSYNCOPTS+=(--no-motd)
+    2)
+        ;&
+    1)
         ;&
     0)  RSYNCOPTS+=(-q)
         ;;
 esac
+
+
+# Some startup output depending on selected verbosity.
+if (( VERBOSE >= 1 )); then
+    echo -n 'Mirror starting: '
+    date
+fi
+
+if (( VERBOSE >= 6 )); then
+    echo Times:
+    echo LASTTIME=$LASTTIME
+    echo starttime=$starttime
+    echo TIMEFILE=$TIMEFILE
+    echo Dirs:
+    echo tempd=$tempd
+    echo DESTD=$DESTD
+    echo Rsync:
+    echo REMOTE=$REMOTE
+    echo MASTERMODULE=$MASTERMODULE
+    echo RSYNC=$RSYNC
+    echo RSYNCOPTS=$RSYNCOPTS
+    echo Modules:
+    echo MODULES=$MODULES
+    echo MODULEMAPPING=$MODULEMAPPING
+    echo
+fi
+
+(( VERBOSE >= 8 )) && set -x
 
 if [[ $MIRRORBUFFET -ne '0' ]]; then
     # We want to mirror everything, so save the admin from listing the
