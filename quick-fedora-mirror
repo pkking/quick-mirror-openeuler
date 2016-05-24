@@ -16,10 +16,10 @@ starttime=$(($starttime-5))
 
 # Utility functions
 
-db () { (( VERBOSE >= 1 )) && echo '>>' $* }
-db2 () { (( VERBOSE >= 2 )) && echo '>>>>' $* }
-db3 () { (( VERBOSE >= 3 )) && echo '>>>>>>' $* }
-db4 () { (( VERBOSE >= 4 )) && echo '>>>>>>>>' $* }
+db1 () { (( VERBOSE >= 1 )) && echo $* }
+db2 () { (( VERBOSE >= 2 )) && echo $* }
+db3 () { (( VERBOSE >= 3 )) && echo '>>' $* }
+db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $* }
 sep () { (( VERBOSE >= 2 )) && echo '============================================================' }
 
 finish () {
@@ -43,6 +43,16 @@ do_rsync () {
     local log=rsync.log
     local errlog=rsync-error.log
 
+    local -a verboseopts
+    # These add to the default rsync verbosity
+    (( VERBOSE >= 7 )) && verboseopts+=(--progress)
+    (( VERBOSE >= 5 )) && verboseopts+=(-v)
+    (( VERBOSE >= 4 )) && verboseopts+=(-v)
+
+    # These remove from the default rsync verbosity
+    (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
+    (( VERBOSE == 0 )) && verboseopts+=(-q)
+
     while true; do
         # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
         # broken array handling.   bash 4.3 has local -n for this.  Older bash
@@ -56,17 +66,17 @@ do_rsync () {
         # 2 - Only some of stdout (the summary line at the end of the transfer)
         # 5 - Now start showing more output.  What to show?
         if (( VERBOSE >= 5 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest
-            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest
+            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest
         elif (( VERBOSE >= 2 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log
-            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log
+            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log
         elif (( VERBOSE == 1 )); then
-            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
         else
-            db Calling $RSYNC $RSYNCOPTS ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
         fi
         rsyncreturn=$?
 
@@ -202,31 +212,6 @@ tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
 trap "rm -rf $tempd" EXIT
 cd $tempd
 
-# Spit out some extra information
-case $VERBOSE in
-    8)
-        ;&
-    7)
-        RSYNCOPTS+=(--progress)
-        ;&
-    6)
-        ;&
-    5)  RSYNCOPTS+=(-v)
-        ;&
-    4)  RSYNCOPTS+=(-v)
-        ;&
-    3)
-        RSYNCOPTS+=(--no-motd)
-        ;;
-    2)
-        ;&
-    1)
-        ;&
-    0)  RSYNCOPTS+=(-q)
-        ;;
-esac
-
-
 # Some startup output depending on selected verbosity.
 if (( VERBOSE >= 1 )); then
     echo -n 'Mirror starting: '
@@ -280,88 +265,88 @@ for module in $MODULES; do
         filelisttime=$(stat --format=%Y $FILELIST)
     fi
 
-    do_rsync $REMOTE/$module/$FILELIST . #rsync-$module rsync-err-$module
+    do_rsync $REMOTE/$module/$FILELIST .
 
     if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
         db2 No change in file list mtime.  Skipping $module.
         continue
     fi
 
-    db2 ++ Extracting lists
+    db3 Extracting lists
 
-    # Get files on the server which changed since the last mirror
+
+    # All files in the remote repository.
+    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
+
+    # All dirs in the remote repository.
+    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > alldirs-$module
+
+    linecount=$(wc -l < allfiles-$module)
+    linecount2=$(wc -l < alldirs-$module)
+    db2 "Remote:      $linecount files, $linecount2 dirs."
+
+
+    # Files on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newfiles-$module
-    linecount=$(wc -l < newfiles-$module)
-    db3 Found $linecount new or updated files in $module since last run.
-
-    # We always want to transfer the file list itself in the transaction.
-    echo $moduledir/$FILELIST >> newfiles-$module
-    cat newfiles-$module >> master-transferlist
-    totallines=$((totallines+linecount))
 
     # Dirs on the server which changed since the last mirror
     awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
-    linecount=$(wc -l < newdirs-$module)
-    db3 Found $linecount new or updated dirs in $module since last run.
+
+    linecount=$(wc -l < newfiles-$module)
+    linecount2=$(wc -l < newdirs-$module)
+    db2 "New/Updated: $linecount files, $linecount2 dirs."
+
+    echo $moduledir/$FILELIST >> newfiles-$module
+    cat newfiles-$module >> master-transferlist
     cat newdirs-$module >> master-transferlist
-    totallines=$((totallines+linecount))
+    totallines=$((totallines+linecount+linecount2+1))
 
-    # Get a list of all files which should be in the repository
-    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
-    linecount=$(wc -l < allfiles-$module)
-    db3 Found $linecount remote files in $module.
-
-    # Get a list of all of the directories which should be in the repository
-    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > alldirs-$module
-    linecount=$(wc -l < alldirs-$module)
-    db3 Found $linecount remote dirs in $module.
-
-    # XXX reorder these to make more intelligent debugging output
     if [[ -d $DESTD/$moduledir ]]; then
-        db4 ++ Generating local dir lists
+        db3 Generating local dir lists
         pushd $DESTD
         find $moduledir/* -type d > $tempd/localdirs-$module
         popd
 
-        linecount=$(wc -l < localdirs-$module)
-        db3 Found $linecount local dirs in $module.
-
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
-        linecount=$(wc -l < deletedirs-$module)
-        db3 ++ Will remove $linecount stale dirs from $moduledir.
         cat deletedirs-$module >> master-deletedirs
 
         # Find dirs on the server which are missing on the client
         sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
-        linecount=$(wc -l < missingdirs-$module)
-        db3 Found $linecount missing dirs in $module.
         cat missingdirs-$module >> master-transferlist
         totallines=$((totallines+linecount))
 
-        db4 ++ Generating local file lists
+        db3 Generating local file lists
         pushd $DESTD
-        db4 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
+        #db4 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
         find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
         popd
-        linecount=$(wc -l < localfiles-$module)
-        db3 Found $linecount local files in $module.
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
-        linecount=$(wc -l < deletefiles-$module)
-        db2 ++ Will remove $linecount stale files from $module.
         cat deletefiles-$module >> master-deletefiles
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
-        linecount=$(wc -l < missingfiles-$module)
-        db3 Found $linecount missing files in $module.
         cat missingfiles-$module >> master-transferlist
-        totallines=$((totallines+linecount))
+
+        linecount=$(wc -l < localfiles-$module)
+        linecount2=$(wc -l < localdirs-$module)
+        db2 "Local:       $linecount files, $linecount dirs."
+
+        linecount=$(wc -l < deletefiles-$module)
+        linecount2=$(wc -l < deletedirs-$module)
+        db2 "Stale:       $linecount files, $linecount2 dirs."
+
+        linecount=$(wc -l < missingfiles-$module)
+        linecount2=$(wc -l < missingdirs-$module)
+        totallines=$((totallines+linecount+linecount2))
+        db2 "Missing:     $linecount files, $linecount2 dirs."
 
     fi
-    db2 Finished processing.  Added $totallines files and dirs to the transfer list.
+
+
+    db2 Finished processing $module.  Added $totallines files and dirs to the transfer list.
 done
 
 if [[ ! -e master-transferlist ]]; then
@@ -373,7 +358,7 @@ fi
 sort -u master-transferlist > master-transferlist.sorted
 linecount=$(wc -l < master-transferlist.sorted)
 sep; sep
-db2 Beginning transfer of $linecount files.
+db2 Transferring $linecount files.
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
@@ -390,7 +375,6 @@ if [[ -s master-deletedirs ]]; then
     else
         db2 Removing $linecount stale directories.
         for nuke in $(cat master-deletedirs); do
-            db4 Checking $DESTD/$nuke
             if [[ -d "$DESTD/$nuke" ]]; then
                 db4 Removing $nuke
                 rm -rf "$DESTD/$nuke"
