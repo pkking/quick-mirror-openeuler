@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Note: this is only an example of how you'd call create-filelist..
+
 MOD=$1
 [ -z "$MOD" ] && {
     echo "usage: $0 <module>"
