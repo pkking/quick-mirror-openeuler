@@ -24,6 +24,18 @@ def get_ftype(entry):
     return 'f'
 
 
+def sha1(fname):
+    """Return the SHA1 checksum of a file in hex."""
+    fh = open(fname, 'rb')
+    sha1 = hashlib.sha1()
+    block = fh.read(2 ** 16)
+    while len(block) > 0:
+        sha1.update(block)
+        block = fh.read(2 ** 16)
+
+    return sha1.hexdigest()
+
+
 def recursedir(path='.'):
     """Just like scandir, but recursively."""
     for entry in scandir(path):
@@ -99,8 +111,7 @@ def main():
     print('\n[Checksums SHA1]', file=opts.timelist)
 
     for f in sorted(checksums):
-        sha = hashlib.sha1(f).hexdigest()
-        print('{0}\t{1}'.format(sha, f), file=opts.timelist)
+        print('{0}\t{1}'.format(sha1(f), f), file=opts.timelist)
 
 
 if __name__ == '__main__':
