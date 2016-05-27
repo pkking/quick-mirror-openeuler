@@ -262,6 +262,7 @@ for module in $MODULES; do
     rm -f $FILELIST
     if [[ -f $DESTD/$moduledir/$FILELIST ]]; then
         cp -p $DESTD/$moduledir/$FILELIST .
+        cp -p $DESTD/$moduledir/$FILELIST $FILELIST.old
         filelisttime=$(stat --format=%Y $FILELIST)
     fi
 
@@ -272,8 +273,12 @@ for module in $MODULES; do
         continue
     fi
 
-    db3 Extracting lists
+    if (( VERBOSE >= 4 )); then
+        echo "Changes in file list since last run:"
+        diff -u $FILELIST.old $FILELIST
+    fi
 
+    db3 Extracting file and directory lists.
 
     # All files in the remote repository.
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
