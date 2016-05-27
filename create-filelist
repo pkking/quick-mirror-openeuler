@@ -98,7 +98,7 @@ def main():
 
     print('\n[Checksums SHA1]', file=opts.timelist)
 
-    for f in checksums:
+    for f in sorted(checksums):
         sha = hashlib.sha1(f).hexdigest()
         print('{0}\t{1}'.format(sha, f), file=opts.timelist)
 
