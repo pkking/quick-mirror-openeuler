@@ -119,21 +119,69 @@ fedora-enchilada.
 Server
 ======
 
-The server must include one file (by default, fullfiletimelist) per module to
-be mirrored using this code.  This file is created by running
-``create-filelist``.  This will generate a list of all files in the current
-directory in the proper format and write it to ``STDOUT``.  This output should be
-captured to a tempfile and moved into place once the run is complete.  It could
-do that directory but I wanted to keep it simple.
+The server must include one file (by default named fullfiletimelist) per module
+to be mirrored using this code.  This file is created by running
+``create-filelist``.  This will generate a list of all files in the specified
+directory in the proper format and write it to the specified file.  It is
+generally best to write this to a temporary location and only move it into
+place if the contents actually changed.  It will also optionally generate a
+simple list of files, as Fedora also maintains such a file.
 
-The timestamp in the file list is the newer of mtime and ctime.  This means
-that newly created hardlinks will cause both the original and the new version
-of the file to appear to have been updated.  ``rsync`` will note that the extra
-files are up to date and will create the hardlinks directory (assuming, of
-course, that it is called with ``-H``).
+The output contains a timestamp and size for each file.  The timestamp in the
+file list is the newer of mtime and ctime.  This means that newly created
+hardlinks will cause both the original and the new version of the file to
+appear to have been updated.  ``rsync`` will note that the extra files are up
+to date and will create the hardlinks directory (assuming, of course, that it
+is called with ``-H``).  But this works *only* if all of the file lists are
+updated at once.
+
+The output also includes a section with checksums of selected files.  By
+default, this includes only the repomd.xml files, because they are important,
+their names never change and neither does their size.  So if they ever get
+missed by the mirror process somehow, it's still possible to detect this
+situation.
 
 The format of the file list is simple enough to be parsed by a shell script
 with a few calls to awk.
+
+Options
+-------
+
+``create-filelist`` takes the following options:
+
+-d
+	The directory to scan.
+
+-t
+    The filename of the full file list with times.
+    Defaults to stdout.
+
+-f
+    The filename of the list of files with no additional data.
+	If not specified, no plain file list is generated.
+
+-c
+	Include checksums of all repomd.xml files.
+
+-C
+	Include checksums of all of the specified filenames wherever they appear in
+	the repository.  May be specified multiple times.
+
+-s
+    Don't include any fullfiletimelist files in the file list with times to
+    avoid inception.
+
+-S
+    Don't include the named file in the file list with times.  May be specified
+    multiple times.
+
+Integration
+-----------
+
+An example of how you might call ``create-filelist`` as part of a larger system
+to manage several modules is given in the ``example-create-filelist-wrapper``.
+This is only an example, and will at least need to be edited as appropriate for
+your environment.
 
 Downstream Mirrors
 ==================
