@@ -35,6 +35,7 @@ TIMELIST='fullfiletimelist-$mod'
     # If you don't want to wait forever, try one of the following:
     # flock -n 9 || exit 1      - Gives up immediately
     # flock -w 120 9 || exit 1  - Waits 120 seconds and then gives up
+    # Don't change the '9', unless you change the last line of this script.
 
     tmpd=$(mktemp -d -t create-filelist.XXXXXXXXXX)
     trap "rm -rf $tmpd" EXIT
