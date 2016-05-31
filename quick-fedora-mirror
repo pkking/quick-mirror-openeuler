@@ -278,7 +278,26 @@ for module in $MODULES; do
         diff -u $FILELIST.old $FILELIST
     fi
 
+    # Check version
+    # awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
+
+    # Extract Files section:
+
+    # awk -F '\t' '/^\[Files/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
+    # Just the pathname column: print $4
+
+    # Just files/links, not dirs:
+    # awk -F '\t' "\\[Files/ {s=1; next} /^\$/ {s=0} {if (s && \$2 == \"f\" || \$2 == \"l\") print \"$moduledir/\" \$4}' < $FILELIST
+
+    # Just dirs:
+    # awk -F '\t' "\\[Files/ {s=1; next} /^\$/ {s=0} {if (s && \$2 == \"d\") print \"$moduledir/\" \$4}' < $FILELIST
+
+    # Extract Checksums section:
+    # awk -F '\t' '/^\[Checksums/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
+    #
+
     db3 Extracting file and directory lists.
+
 
     # All files in the remote repository.
     awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
