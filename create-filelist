@@ -60,16 +60,16 @@ def parseopts():
     p.add_argument('-C', '--checksum-file', action='append', dest='checksum_files',
                    help='Include checksums of all instances of the specified file.')
     p.add_argument('-s', '--skip', action='store_true',
-                   help='Skip fullfiletimelist in the top directory')
+                   help='Skip the --filelist file in the top directory')
     p.add_argument('-S', '--skip-file', action='append', dest='skip_files',
                    help='Skip the specified file in the top directory.')
 
     p.add_argument('-d', '--dir', help='Directory to scan (default: .).')
 
     p.add_argument('-t', '--timelist', type=argparse.FileType('w'), default=sys.stdout,
-                   help='Filename of the file list with times (default: fullfiletimelist).')
+                   help='Filename of the file list with times (default: stdout).')
     p.add_argument('-f', '--filelist', type=argparse.FileType('w'), default=null,
-                   help='Filename of the file list without times (default: fullfilelist).')
+                   help='Filename of the file list without times (default: no plain file list is generated).')
 
     opts = p.parse_args()
 
@@ -82,7 +82,8 @@ def parseopts():
 
     opts.skip_files = opts.skip_files or []
     if opts.skip:
-        opts.skip_files += ['fullfiletimelist']
+        if not opts.timelist.name == '<stdout>':
+            opts.skip_files += [opts.timelist.name]
 
     return opts
 
