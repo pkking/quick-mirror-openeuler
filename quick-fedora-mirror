@@ -57,7 +57,7 @@ do_rsync () {
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
     (( VERBOSE == 0 )) && verboseopts+=(-q)
 
-    flopts=(--files-from $files)
+    flopts=(--files-from=$files)
 
     while true; do
         # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
@@ -66,16 +66,20 @@ do_rsync () {
         # https://stackoverflow.com/questions/1063347/passing-arrays-as-parameters-in-bash
         # Or just use a freaking global.
 
+        # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
         if (( VERBOSE >= 5 )); then
-            log=/dev/stdout
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+            rsyncreturn=$?
+        elif (( VERBOSE >= 2 )); then
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log
+            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
+            rsyncreturn=$?
+        else
+            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
+            rsyncreturn=$?
         fi
-        if (( VERBOSE >= 2 )); then
-            errlog=/dev/stderr
-        fi
-
-        db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-        $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
-        rsyncreturn=$?
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
@@ -123,9 +127,11 @@ while [[ $# > 0 ]]; do
         -n)
             skiprsync=1
             skipdelete=1
+            skiptimestamp=1
             ;;
         -N)
             skipdelete=1
+            skiptimestamp=1
             ;;
         -t)
             backdate=$2
@@ -296,20 +302,21 @@ for module in $MODULES; do
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
-    if [[ -z $alwayscheck && $(stat --format=%Y $fl.old) == $(stat --format=%Y $fl) ]]; then
+    if [[ -z $alwayscheck && -f $fl.old && $(stat --format=%Y $fl.old) == $(stat --format=%Y $fl) ]]; then
         db2 No change in file list mtime.  Skipping $module.
         continue
     fi
 
-    if (( VERBOSE >= 4 )); then
+    if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
         echo "Changes in file list since last run:"
         diff -u $fl.old $fl
     fi
 
     flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
     if [[ $flversion != '2' ]]; then
-        (>&2 echo File list version from the mirror cannot be processed by this script.)
-        exit 1
+        (>&2 echo File list version from the mirror cannot be processed by this script.
+        echo Skipping $module.)
+        continue
     fi
 
     # Extract Files section:
@@ -335,7 +342,7 @@ for module in $MODULES; do
 
     linecount=$(wc -l < allfiles-$module)
     linecount2=$(wc -l < alldirs-$module)
-    db2f "Remote:  %7d files, %4d dirs.\n" $linecount1 $linecount2
+    db2f "Total on server:       %7d files, %4d dirs.\n" $linecount $linecount2
 
     # Files on the server which changed since the last run
     awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
@@ -351,11 +358,11 @@ for module in $MODULES; do
 
     linecount=$(wc -l < newfiles-$module)
     linecount2=$(wc -l < newdirs-$module)
-    db2f "New:     %7d files, %4d dirs.\n" $linecount $linecount2
+    db2f "New on server:         %7d files, %4d dirs.\n" $linecount $linecount2
 
     echo $moduledir/$fl >> newfiles-$module
-    cat newfiles-$module >> master-transferlist
-    cat newdirs-$module >> master-transferlist
+    cat newfiles-$module >> transferlist-$module
+    cat newdirs-$module >> transferlist-$module
     totallines=$((totallines+linecount+linecount2+1))
 
     if [[ -d $DESTD/$moduledir ]]; then
@@ -377,7 +384,7 @@ for module in $MODULES; do
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
-        cat missingfiles-$module >> master-transferlist
+        cat missingfiles-$module >> transferlist-$module
 
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
@@ -385,45 +392,48 @@ for module in $MODULES; do
 
         # Find dirs on the server which are missing on the client
         sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
-        cat missingdirs-$module >> master-transferlist
+        cat missingdirs-$module >> transferlist-$module
 
         # Find files which have changed size
         sort allfilesizes-$module localfilesizes-$module | uniq -u | awk -F '\t' '{print $1}' | uniq -d > updatedfiles-$module
+        cat updatedfiles-$module >> transferlist-$module
 
         # Extract checksums
-        awk -F '\t' '/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print $0}' $fl > checksums-$module
-        pushd $DESTD/$moduledir > /dev/null 2>&1
+        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
+
+        pushd $DESTD > /dev/null 2>&1
         sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null | grep -i 'failed$' | awk -F: '{print $1}' > $tempd/checksumfailed-$module
         popd > /dev/null 2>&1
-
-        cat checksumfailed-$module
-
-        # XXX Need to add updated files, failed checksums to the transfer list.
+        cat checksumfailed-$module >> transferlist-$module
 
         linecount=$(wc -l < localfiles-$module)
         linecount2=$(wc -l < localdirs-$module)
-        db2f "Local:   %7d files, %4d dirs.\n" $linecount $linecount2
+        db2f "Total on client:       %7d files, %4d dirs.\n" $linecount $linecount2
 
         linecount=$(wc -l < deletefiles-$module)
         linecount2=$(wc -l < deletedirs-$module)
-        db2f "Stale:   %7d files, %4d dirs.\n" $linecount $linecount2
+        db2f "Not present on server: %7d files, %4d dirs.\n" $linecount $linecount2
 
         linecount=$(wc -l < missingfiles-$module)
         linecount2=$(wc -l < missingdirs-$module)
         totallines=$((totallines+linecount+linecount2))
-        db2f "Missing: %7d files, %4d dirs.\n" $linecount $linecount2
+        db2f "Missing on client:     %7d files, %4d dirs.\n" $linecount $linecount2
 
         linecount=$(wc -l < updatedfiles-$module)
-        db2f "Sizechg: %7d files.\n" $linecount
+        totallines=$((totallines+linecount))
+        db2f "Size Changed:          %7d files.\n" $linecount
 
-        echo AAAAAAAAAAAAAAA
-        cat checksums-$module
-        echo BBBBBBBBBBBBBBB
-        exit
+        linecount=$(wc -l < checksumfailed-$module)
+        totallines=$((totallines+linecount))
+        db2f "Checksum Failed:       %7d files.\n" $linecount
     fi
 
-    # XXX totallines is completely wrong here
-    db2 Finished processing $module.  Added $totallines files and dirs to the transfer list.
+    sort -u transferlist-$module >> transferlist-sorted-$module
+    cat transferlist-sorted-$module >> master-transferlist
+    linecount=$(wc -l < transferlist-sorted-$module)
+
+    db2 Finished processing $module.
+    db2 After removing duplicates, $linecount files and dirs were added to the transfer list.
 done
 
 if [[ ! -e master-transferlist ]]; then
@@ -440,8 +450,7 @@ db2 Transferring $linecount files.
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-extra=(--files-from master-transferlist.sorted)
-do_rsync $REMOTE/$MASTERMODULE/ $DESTD extra
+do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
 
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
@@ -486,7 +495,7 @@ else
 fi
 
 
-if [[ -z $skipdelete ]]; then
+if [[ -z $skiptimestamp ]]; then
     db2 Saving mirror time to $TIMEFILE
     if [[ -e $TIMEFILE ]]; then
         mv $TIMEFILE $TIMEFILE.prev
