@@ -21,6 +21,7 @@ db2 () { (( VERBOSE >= 2 )) && echo $* }
 db3 () { (( VERBOSE >= 3 )) && echo '>>' $* }
 db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $* }
 sep () { (( VERBOSE >= 2 )) && echo '============================================================' }
+db2f () { (( VERBOSE >= 2 )) && printf $* }
 
 finish () {
     if (( $VERBOSE >= 1 )); then
@@ -30,6 +31,8 @@ finish () {
     exit 0
 }
 
+# XXX investigate using --compare-dest/--link-dest: specify all mirrored
+# modules with --link-dest to ensure that all possible hardlinking is done.
 do_rsync () {
     # Options: source, destination.
     # The name of an array containing additional options.
@@ -38,7 +41,8 @@ do_rsync () {
     # the function).
     local src=$1
     local dest=$2
-    local opts=$3
+    local files=$3
+    local opts=$4
     local sleep=1
     local log=rsync.log
     local errlog=rsync-error.log
@@ -53,6 +57,8 @@ do_rsync () {
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
     (( VERBOSE == 0 )) && verboseopts+=(-q)
 
+    flopts=(--files-from $files)
+
     while true; do
         # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
         # broken array handling.   bash 4.3 has local -n for this.  Older bash
@@ -60,28 +66,20 @@ do_rsync () {
         # https://stackoverflow.com/questions/1063347/passing-arrays-as-parameters-in-bash
         # Or just use a freaking global.
 
-        # Redirect to files based on VERBOSE
-        # 0 - stdout and stderr redirected; dump stderr at end after ten tries
-        # 1 - stdout redirected; stderr not redirected
-        # 2 - Only some of stdout (the summary line at the end of the transfer)
-        # 5 - Now start showing more output.  What to show?
         if (( VERBOSE >= 5 )); then
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest
-            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest
-        elif (( VERBOSE >= 2 )); then
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log
-            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log
-        elif (( VERBOSE == 1 )); then
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
-        else
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-            $RSYNC $RSYNCOPTS $verboseopts ${(P)opts} $src $dest >> $log >> $log 2>> $errlog
+            log=/dev/stdout
         fi
+        if (( VERBOSE >= 2 )); then
+            errlog=/dev/stderr
+        fi
+
+        db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+        $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
         rsyncreturn=$?
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
+        # XXX Dead code?
         if [[ $VERBOSE -gt 1 && -f $errlog ]]; then
             (>&2 cat $errlog)
             rm $errlog
@@ -98,6 +96,9 @@ do_rsync () {
     done
 
     # If we got here, we have a successful run.
+    # XXX Grep the "interesting" information from the logs, according to verbosity.
+    #   2 - Only some of stdout (the summary line at the end of the transfer)
+    #   5 - Now start showing more output.  What to show?
 }
 
 # Parse args
@@ -162,13 +163,13 @@ DESTD=
 TIMEFILE=
 
 REMOTE=rsync://dl.fedoraproject.org
-FILELIST=fullfiletimelist
-
+FILELIST='fullfiletimelist-$mdir'
 RSYNC=/usr/bin/rsync
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
     RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delete-delay --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
 else
     RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delete-delay --delay-updates)
 fi
@@ -234,7 +235,8 @@ if (( VERBOSE >= 6 )); then
     echo Modules:
     echo MODULES=$MODULES
     echo MODULEMAPPING=$MODULEMAPPING
-    echo
+    echo Misc:
+    echo VERBOSE=$VERBOSE
 fi
 
 (( VERBOSE >= 8 )) && set -x
@@ -246,105 +248,128 @@ if [[ $MIRRORBUFFET -ne '0' ]]; then
     MODULES=(${(k)MODULEMAPPING})
 fi
 
-# We have to accumulate a big list of everything that needs to be
-# transferred from all of the modules
+
+# Fetch all of the file lists
+sep
+db2 Downloading file lists
+# ZSHISM (declare associative array)
+typeset -A fltimes
+for module in $MODULES; do
+    # ZSHISM? (associative array indexing)
+    moduledir=$MODULEMAPPING[$module]
+    flname=${FILELIST/'$mdir'/$moduledir}
+
+    mkdir $moduledir
+    rm -f $flname
+    # ZSHISM (assign assoc. array value)
+    fltimes[$module]=0
+    if [[ -f $DESTD/$moduledir/$flname ]]; then
+        cp -p $DESTD/$moduledir/$flname $moduledir
+        # So that we can diff it later
+        cp -p $moduledir/$flname $flname.old
+        # ZSHISM (assign assoc. array value)
+        fltimes[$module]=$(stat --format=%Y $moduledir/$flname)
+    fi
+
+    echo $moduledir/$flname >> filelist-transferlist
+done
+
+extra=(--no-dirs --relative)
+do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
+
+# rsync won't transfer those files to the current directory, so move them and
+# clean up.
+mv */* .
+rmdir * 2> /dev/null
+
+# Now we have an updated set of filelists in the current directory
 for module in $MODULES; do
     sep
     db2 Processing $module
 
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
+
+    fl=${FILELIST/'$mdir'/$moduledir}
     totallines=0
 
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
-    rm -f $FILELIST
-    if [[ -f $DESTD/$moduledir/$FILELIST ]]; then
-        cp -p $DESTD/$moduledir/$FILELIST .
-        cp -p $DESTD/$moduledir/$FILELIST $FILELIST.old
-        filelisttime=$(stat --format=%Y $FILELIST)
-    fi
-
-    do_rsync $REMOTE/$module/$FILELIST .
-
-    if [[ -z $alwayscheck && $filelisttime == $(stat --format=%Y $FILELIST) ]]; then
+    if [[ -z $alwayscheck && $(stat --format=%Y $fl.old) == $(stat --format=%Y $fl) ]]; then
         db2 No change in file list mtime.  Skipping $module.
         continue
     fi
 
     if (( VERBOSE >= 4 )); then
         echo "Changes in file list since last run:"
-        diff -u $FILELIST.old $FILELIST
+        diff -u $fl.old $fl
     fi
 
-    # Check version
-    # awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
+    flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
+    if [[ $flversion != '2' ]]; then
+        (>&2 echo File list version from the mirror cannot be processed by this script.)
+        exit 1
+    fi
 
     # Extract Files section:
 
-    # awk -F '\t' '/^\[Files/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
-    # Just the pathname column: print $4
-
-    # Just files/links, not dirs:
-    # awk -F '\t' "\\[Files/ {s=1; next} /^\$/ {s=0} {if (s && \$2 == \"f\" || \$2 == \"l\") print \"$moduledir/\" \$4}' < $FILELIST
-
-    # Just dirs:
-    # awk -F '\t' "\\[Files/ {s=1; next} /^\$/ {s=0} {if (s && \$2 == \"d\") print \"$moduledir/\" \$4}' < $FILELIST
-
     # Extract Checksums section:
     # awk -F '\t' '/^\[Checksums/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
-    #
 
     db3 Extracting file and directory lists.
 
-
     # All files in the remote repository.
-    awk "{if (\$2 == \"f\" || \$2 == \"l\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > allfiles-$module
+    # Extract with the sizes and then extract just the file names from that.
+    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                 {if (s && \$2 == \"f\" || \$2 == \"l\")
+                        print \"$moduledir/\" \$4 \"\t\" \$3}
+                " $fl > allfilesizes-$module
+    awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module
 
     # All dirs in the remote repository.
-    awk "{if (\$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > alldirs-$module
+    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                 { if (s && \$2 == \"d\")
+                        print \"$moduledir/\" \$4}
+                " < $fl > alldirs-$module
 
     linecount=$(wc -l < allfiles-$module)
     linecount2=$(wc -l < alldirs-$module)
-    db2 "Remote:      $linecount files, $linecount2 dirs."
+    db2f "Remote:  %7d files, %4d dirs.\n" $linecount1 $linecount2
 
+    # Files on the server which changed since the last run
+    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                 { if (s && \$1 >= $LASTTIME && (\$2 == \"f\" || \$2 == \"l\"))
+                        print \"$moduledir/\" \$4}
+                " < $fl > newfiles-$module
 
-    # Files on the server which changed since the last mirror
-    awk "{if (\$1 >= $LASTTIME) {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newfiles-$module
-
-    # Dirs on the server which changed since the last mirror
-    awk "{if (\$1 >= $LASTTIME && \$2 == \"d\") {print \"$moduledir/\" substr(\$0, 14)}}" < $FILELIST > newdirs-$module
+    # Dirs on the server which changed since the last run
+    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                 { if (s && \$1 >= $LASTTIME &&(\$2 == \"d\"))
+                        print \"$moduledir/\" \$4}
+                " < $fl > newdirs-$module
 
     linecount=$(wc -l < newfiles-$module)
     linecount2=$(wc -l < newdirs-$module)
-    db2 "New/Updated: $linecount files, $linecount2 dirs."
+    db2f "New:     %7d files, %4d dirs.\n" $linecount $linecount2
 
-    echo $moduledir/$FILELIST >> newfiles-$module
+    echo $moduledir/$fl >> newfiles-$module
     cat newfiles-$module >> master-transferlist
     cat newdirs-$module >> master-transferlist
     totallines=$((totallines+linecount+linecount2+1))
 
     if [[ -d $DESTD/$moduledir ]]; then
-        db3 Generating local dir lists
+        db3 Generating local file/dir list
+
+        # Run the find only once to avoid needlessly traversing the filesystem
         pushd $DESTD
-        find $moduledir/* -type d > $tempd/localdirs-$module
+        find $moduledir/* -printf '%y\t%p\t%s\n' > $tempd/localfulllist-$module
         popd
 
-        # Find dirs on the client which don't exist on the server
-        sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
-        cat deletedirs-$module >> master-deletedirs
-
-        # Find dirs on the server which are missing on the client
-        sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
-        cat missingdirs-$module >> master-transferlist
-        totallines=$((totallines+linecount))
-
-        db3 Generating local file lists
-        pushd $DESTD
-        #db4 find $moduledir/* -type f -o -type l '>' $tempd/localfiles-$module
-        find $moduledir/* -type f -o -type l > $tempd/localfiles-$module
-        popd
+        # Now extract file and dir lists from that
+        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2}}' < localfulllist-$module > localfiles-$module
+        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2 "\t" $3}}' < localfulllist-$module > localfilesizes-$module
+        awk -F '\t' '{if ($1 == "d") {print $2}}' < localfulllist-$module > localdirs-$module
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
@@ -354,22 +379,50 @@ for module in $MODULES; do
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
         cat missingfiles-$module >> master-transferlist
 
+        # Find dirs on the client which don't exist on the server
+        sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
+        cat deletedirs-$module >> master-deletedirs
+
+        # Find dirs on the server which are missing on the client
+        sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
+        cat missingdirs-$module >> master-transferlist
+
+        # Find files which have changed size
+        sort allfilesizes-$module localfilesizes-$module | uniq -u | awk -F '\t' '{print $1}' | uniq -d > updatedfiles-$module
+
+        # Extract checksums
+        awk -F '\t' '/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print $0}' $fl > checksums-$module
+        pushd $DESTD/$moduledir > /dev/null 2>&1
+        sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null | grep -i 'failed$' | awk -F: '{print $1}' > $tempd/checksumfailed-$module
+        popd > /dev/null 2>&1
+
+        cat checksumfailed-$module
+
+        # XXX Need to add updated files, failed checksums to the transfer list.
+
         linecount=$(wc -l < localfiles-$module)
         linecount2=$(wc -l < localdirs-$module)
-        db2 "Local:       $linecount files, $linecount dirs."
+        db2f "Local:   %7d files, %4d dirs.\n" $linecount $linecount2
 
         linecount=$(wc -l < deletefiles-$module)
         linecount2=$(wc -l < deletedirs-$module)
-        db2 "Stale:       $linecount files, $linecount2 dirs."
+        db2f "Stale:   %7d files, %4d dirs.\n" $linecount $linecount2
 
         linecount=$(wc -l < missingfiles-$module)
         linecount2=$(wc -l < missingdirs-$module)
         totallines=$((totallines+linecount+linecount2))
-        db2 "Missing:     $linecount files, $linecount2 dirs."
+        db2f "Missing: %7d files, %4d dirs.\n" $linecount $linecount2
 
+        linecount=$(wc -l < updatedfiles-$module)
+        db2f "Sizechg: %7d files.\n" $linecount
+
+        echo AAAAAAAAAAAAAAA
+        cat checksums-$module
+        echo BBBBBBBBBBBBBBB
+        exit
     fi
 
-
+    # XXX totallines is completely wrong here
     db2 Finished processing $module.  Added $totallines files and dirs to the transfer list.
 done
 
