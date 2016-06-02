@@ -103,6 +103,8 @@ do_rsync () {
     # XXX Grep the "interesting" information from the logs, according to verbosity.
     #   2 - Only some of stdout (the summary line at the end of the transfer)
     #   5 - Now start showing more output.  What to show?
+
+    return $rsyncreturn
 }
 
 # Parse args
@@ -175,7 +177,6 @@ RSYNC=/usr/bin/rsync
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
     RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delete-delay --delay-updates)
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
 else
     RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delete-delay --delay-updates)
 fi
@@ -451,6 +452,11 @@ db2 Transferring $linecount files.
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
+
+if [[ $? -ne 0 ]]; then
+    echo rsync finished with nonzero exit status.  Not deleting or updating timestamps.
+    finish
+fi
 
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
