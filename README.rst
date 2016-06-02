@@ -2,17 +2,17 @@ Utilities for mirroring Fedora faster
 =====================================
 
 A full rsync of fedora-buffet0 can take hours just to receive the file list,
-due to the fact that there are over 12.4 million files.  This has to happen for
+due to the fact that there are over 11 million files.  This has to happen for
 every client, every time they want to update, which is murderous on the
 download servers and worse on the backend NFS server.  It also slows the
 propagation of important updates because mirrors simply can't poll often.
 
-By generating a simple database of file and directory timestamps, it becomes
-easy for the client to determine which files have changed since the last mirror
-run and only mirror those files.  This also provides enough information to
-handle files which have been deleted on the server and files which are missing
-on the client.  In most situations, it also allows hardlinks to be copied as
-hardlinks instead of being downloaded multiple times.
+By generating a simple database of file and directory timestamps and sizes, it
+becomes easy for the client to determine which files have changed since the
+last mirror run and only mirror those files.  This also provides enough
+information to handle files which have been deleted on the server and files
+which are missing on the client.  In most situations, it also allows hardlinks
+to be copied as hardlinks instead of being downloaded multiple times.
 
 Client
 ======
@@ -28,17 +28,19 @@ the file to store the last mirror time must be set, though you probably want to
 set the list of modules to mirror as well.
 
 The client downloads the master file list for each module, generates lists of
-new and updated files, deletes files and directories which no longer exist on
-the server, and passes one combined list to rsync via --files-from.  Because
-all modules are copied together, hardlinks between modules will be copied as
-hardlinks.  Files and directories which no longer exist on the server are
-deleted after the copy has completed, similar to the ``--delete-delay`` option
-to ``rsync``.
+new and updated files, plus those with changed sizes or checksums and passes
+one combined list to rsync via --files-from.  Because all modules are copied
+together, hardlinks between modules will be copied as hardlinks.  Files and
+directories which no longer exist on the server are deleted after the copy has
+completed, similar to the ``--delete-delay`` option to ``rsync``.
 
 The speed improvements can be extraordinary.  Just the "receiving file list"
 phase of a mirror of ``fedora-buffet`` can take over ten hours and places a
 huge load on the host from which you're downloading.  With this script it takes
 six seconds.
+
+The client preserves file timestamps, but does not preserve directory
+timestamps in all situations.
 
 Installation
 ------------
@@ -110,11 +112,16 @@ Adding a module
 If you have to add a module after the fact (i.e. you already have
 fedora-enchilada and you want to add fedora-alt), note that rsync will not pick
 up any hardlinks.  You can of course do the download and then run hardlink
-afterwards, or do a full transfer (i.e. using ``-t 0``).  To minimize the sime
+afterwards, or do a full transfer (i.e. using ``-t 0``).  To minimize the time
 spent counting files, you use a configuration file which specifies only the
 modules with which the new module shares hardlinks.  Most of the hardlinks are
-between fedora-archive and fedora-enchilada, or fedora-alt and
-fedora-enchilada.
+between:
+
+* fedora-archive and fedora-enchilada
+
+* fedora-archive and fedora-secondary
+
+* fedora-alt and fedora-enchilada.
 
 Server
 ======
@@ -150,7 +157,7 @@ Options
 ``create-filelist`` takes the following options:
 
 -d
-	The directory to scan.
+    The directory to scan.
 
 -t
     The filename of the full file list with times.
@@ -158,14 +165,14 @@ Options
 
 -f
     The filename of the list of files with no additional data.
-	If not specified, no plain file list is generated.
+    If not specified, no plain file list is generated.
 
 -c
-	Include checksums of all repomd.xml files.
+    Include checksums of all repomd.xml files.
 
 -C
-	Include checksums of all of the specified filenames wherever they appear in
-	the repository.  May be specified multiple times.
+    Include checksums of all of the specified filenames wherever they appear in
+    the repository.  May be specified multiple times.
 
 -s
     Don't include any fullfiletimelist files in the file list with times to
@@ -190,11 +197,14 @@ Note that this method works for downstream mirrors as well.  Intermediate
 mirrors should *not* modify the filelists.
 
 Assuming ``rsync`` is called with --delay-updates, downstream mirrors should
-always have a consistent view of the repository.  Changes should get out very
-quickly, because mirrors can poll frequently without overloading servers.
+always have a consistent view of the repository.  Due to deletes happening
+after rsync runs, downstreams may briefly see a few extra files but if using
+the file lists this shouldn't matter.  Changes should get out very quickly,
+because mirrors can poll frequently without overloading servers.
 
 Non-Fedora Usage
 ================
+
 Note that you can of course run the server component in your own repository,
 but the clients will of course need to specify ``REMOTE``, ``MASTERMODULE`` and
 the ``MODULES`` array to map module names to directories.  The client also the
@@ -202,16 +212,15 @@ assumption that all of the separate module are included in a master module.  If
 you would like to use this code but those constraints don't fit your use case,
 please file an issue and I'll be happy to take a look.
 
-Be sure to run ``create-filelist`` after every repository change.  You can also
-run it from cron, but clients may see the repository in an inconsistent state
-in the interval between the changes and the file list generation.  This will
-not result in any repository corruption, though; clients will pick up the
-correct repository state on the next run.
+Be sure to run ``create-filelist`` after every repository change.  If you
+hardlink files between one module and another, you must update the file lists
+in both modules.  You can also run it from cron, but clients may see the
+repository in an inconsistent state in the interval between the changes and the
+file list generation.  This will not result in any repository corruption,
+though; clients will pick up the correct repository state on the next run.
 
 It's a good idea to run a diff or something and only copy the output into place
-if the new output differs.  Technically ``create-filelist`` could just do this,
-but it is currently easy to integrate into whatever script or arrangement you
-might have in place.
+if the new output differs.  The example wrapper shows one way to do this.
 
 Authorship and License
 ======================
