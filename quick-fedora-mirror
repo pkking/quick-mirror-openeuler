@@ -176,9 +176,9 @@ RSYNC=/usr/bin/rsync
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delete-delay --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delete-delay --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delay-updates)
 fi
 
 MASTERMODULE=fedora-buffet
@@ -454,8 +454,7 @@ db2 Transferring $linecount files.
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
 
 if [[ $? -ne 0 ]]; then
-    echo rsync finished with nonzero exit status.  Not deleting or updating timestamps.
-    finish
+    (>&2 echo rsync finished with nonzero exit status.)
 fi
 
 if [[ -s master-deletedirs ]]; then
@@ -488,13 +487,7 @@ if [[ -s master-deletefiles ]]; then
         cat master-deletefiles
     else
         db2 Removing $linecount stale files.
-        for nuke in $(cat master-deletefiles); do
-            # Use xargs here to speed things up
-            # (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles
-            # At least, I think that works OK.
-            db4 Removing $nuke
-            rm -f "$DESTD/$nuke"
-        done
+        (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles
     fi
 else
     db2 No stale files to delete.
