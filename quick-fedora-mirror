@@ -383,13 +383,33 @@ for module in $MODULES; do
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
         cat deletefiles-$module >> master-deletefiles
 
-        # Find files on the server which are missing on the client
-        sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
-        cat missingfiles-$module >> transferlist-$module
-
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
         cat deletedirs-$module >> master-deletedirs
+
+        # XXX Extract basenames of every file and dir in the delete lists.
+        # Possibilities
+        # awk 'BEGIN{FS="|";OFS=FS} {base=$1;gsub(/.*\//,"",base);print $1,base,$2} deletedirs-$module deletefiles-$module
+        # or
+        # { $0 "\t\t" basename($0) }
+        # function basename(pn) {
+        #     sub(/^.*\//, "", pn)
+        #     return pn
+        # } master-deletedirs | sort -u > master-fixdirtimestamps
+
+		#awk '{ basename($0)	}
+		#function dirname (pathname){
+		#	if (!sub(/\/[^\/]*\/?$/, "", pathname))
+		#		return "."
+		#	else if (pathname != "")
+		#		return pathname
+		#	else
+		#		return "/"
+		#}'
+
+        # Find files on the server which are missing on the client
+        sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
+        cat missingfiles-$module >> transferlist-$module
 
         # Find dirs on the server which are missing on the client
         sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
@@ -469,6 +489,7 @@ if [[ -s master-deletedirs ]]; then
             if [[ -d "$DESTD/$nuke" ]]; then
                 db4 Removing $nuke
                 rm -rf "$DESTD/$nuke"
+                deletedsomething=1
             fi
         done
     fi
@@ -488,9 +509,14 @@ if [[ -s master-deletefiles ]]; then
     else
         db2 Removing $linecount stale files.
         (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles
+        deletedsomething=1
     fi
 else
     db2 No stale files to delete.
+fi
+
+if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
+    # XXX call rsync again with just the dirs which we might have changed by deleting
 fi
 
 
