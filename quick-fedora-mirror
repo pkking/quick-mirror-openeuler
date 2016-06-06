@@ -457,6 +457,11 @@ for module in $MODULES; do
 
     db2 Finished processing $module.
     db2 After removing duplicates, $linecount files and dirs were added to the transfer list.
+
+    # Clean up a bit.
+    if (( VERBOSE <= 4 )); then
+        rm *-$module
+    fi
 done
 
 if [[ ! -e master-transferlist ]]; then
