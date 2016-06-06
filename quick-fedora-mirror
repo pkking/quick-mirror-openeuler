@@ -216,8 +216,11 @@ if [[ -n $backdate ]]; then
     LASTTIME=$backdate
 fi
 
+# Make a temp dir and clean it up unless we're doing a lot of debugging
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
-trap "rm -rf $tempd" EXIT
+if (( VERBOSE <= 6 )); then
+    trap "rm -rf $tempd" EXIT
+fi
 cd $tempd
 
 # Some startup output depending on selected verbosity.
@@ -397,15 +400,15 @@ for module in $MODULES; do
         #     return pn
         # } master-deletedirs | sort -u > master-fixdirtimestamps
 
-		#awk '{ basename($0)	}
-		#function dirname (pathname){
-		#	if (!sub(/\/[^\/]*\/?$/, "", pathname))
-		#		return "."
-		#	else if (pathname != "")
-		#		return pathname
-		#	else
-		#		return "/"
-		#}'
+        #awk '{ basename($0)	}
+        #function dirname (pathname){
+        #	if (!sub(/\/[^\/]*\/?$/, "", pathname))
+        #		return "."
+        #	else if (pathname != "")
+        #		return pathname
+        #	else
+        #		return "/"
+        #}'
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
@@ -483,6 +486,7 @@ if [[ -s master-deletedirs ]]; then
     if [[ -n $skipdelete ]]; then
         echo Not deleting  $linecount directories.  Delete list is:
         cat master-deletedirs
+        echo
     else
         db2 Removing $linecount stale directories.
         for nuke in $(cat master-deletedirs); do
@@ -506,6 +510,7 @@ if [[ -s master-deletefiles ]]; then
     if [[ -n $skipdelete ]]; then
         echo Not deleting $linecount stale files.  Delete list is:
         cat master-deletefiles
+        echo
     else
         db2 Removing $linecount stale files.
         (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles

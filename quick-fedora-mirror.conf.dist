@@ -45,6 +45,13 @@ TIMEFILE=
 # complaints from rsync, but should not cause any problems.
 # RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
 
+# Define KEEPDIRTIMES (to anything) to make a third rsync call which restores
+# the timestamps of any directories which were modified after file removal.
+# This won't ensure that timestamps are always up to date, but its good enough
+# if you don't modify your repository locally.  Maintaining directory
+# timestamps isn't important for mirroring in any case.
+# KEEPDIRTIMES=
+#
 # Verbosity level
 # 0 - quiet
 # 1 - start and end times
