@@ -182,7 +182,6 @@ else
 fi
 
 MASTERMODULE=fedora-buffet
-MIRRORBUFFET=0
 MODULES=(fedora-enchilada fedora-epel)
 
 # Load up the configuration file
@@ -251,7 +250,7 @@ fi
 
 (( VERBOSE >= 8 )) && set -x
 
-if [[ $MIRRORBUFFET -ne '0' ]]; then
+if [[ -n $MIRRORBUFFET ]]; then
     # We want to mirror everything, so save the admin from listing the
     # individual modules.
     # ZSHISM (get keys from an associative array with (k))

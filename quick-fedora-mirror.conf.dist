@@ -18,9 +18,9 @@ TIMEFILE=
 # Tier 1 mirrors should change this to fedora-buffet0
 # MASTERMODULE=fedora-buffet
 
-# Set to 1 if the entire repository (all modules under fedora-buffet) should be
+# Define if the entire repository (all modules under fedora-buffet) should be
 # mirrored.  If set, MODULES (below) is ignored
-# MIRRORBUFFET=0
+# MIRRORBUFFET=
 
 # An array containing the modules to be mirrored
 # MODULES=(fedora-enchilada fedora-epel)
