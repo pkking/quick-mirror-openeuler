@@ -17,6 +17,10 @@ fi
 
 CREATE=/usr/local/bin/create-filelist
 
+tmpd=$(mktemp -d -t create-filelist.XXXXXXXXXX)
+trap "rm -rf $tmpd" EXIT
+cd $tmpd
+
 # A single lockfile for everything we're modifying
 LOCKFILE=.lock.create-filelist
 
@@ -36,10 +40,6 @@ TIMELIST='fullfiletimelist-$mod'
     # flock -n 9 || exit 1      - Gives up immediately
     # flock -w 120 9 || exit 1  - Waits 120 seconds and then gives up
     # Don't change the '9', unless you change the last line of this script.
-
-    tmpd=$(mktemp -d -t create-filelist.XXXXXXXXXX)
-    trap "rm -rf $tmpd" EXIT
-    cd $tmpd
 
     # Create all of the filelists
     for mod in $mods; do
