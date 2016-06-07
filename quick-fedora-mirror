@@ -258,7 +258,8 @@ if [[ -n $MIRRORBUFFET ]]; then
 fi
 
 
-# Fetch all of the file lists
+# Master file list fetching
+# =========================
 sep
 db2 Downloading file lists
 # ZSHISM (declare associative array)
@@ -291,7 +292,8 @@ do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
 mv */* .
 rmdir * 2> /dev/null
 
-# Now we have an updated set of filelists in the current directory
+# File list generation
+# ====================
 for module in $MODULES; do
     sep
     db2 Processing $module
@@ -469,7 +471,8 @@ if [[ ! -e master-transferlist ]]; then
     finish
 fi
 
-# rsync prefers sorted file lists and will complain if there are duplicates
+# The actual transfer
+# ===================
 sort -u master-transferlist > master-transferlist.sorted
 linecount=$(wc -l < master-transferlist.sorted)
 sep; sep
@@ -484,6 +487,8 @@ if [[ $? -ne 0 ]]; then
     (>&2 echo rsync finished with nonzero exit status.)
 fi
 
+# Local dir/file deletion
+# =======================
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
 
@@ -505,9 +510,6 @@ else
     db2 No stale directories to delete.
 fi
 
-# If we had deleted the directories before making the list of stale files, we
-# could save a lot of work here.  But since we have to delay the process, most
-# of these will probably have been deleted above.
 if [[ -s master-deletefiles ]]; then
     linecount=$(wc -l < master-deletefiles)
 
@@ -529,6 +531,8 @@ if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
 fi
 
 
+# State saving
+# ============
 if [[ -z $skiptimestamp ]]; then
     db2 Saving mirror time to $TIMEFILE
     if [[ -e $TIMEFILE ]]; then
