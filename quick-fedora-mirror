@@ -391,25 +391,10 @@ for module in $MODULES; do
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
         cat deletedirs-$module >> master-deletedirs
 
-        # XXX Extract basenames of every file and dir in the delete lists.
-        # Possibilities
-        # awk 'BEGIN{FS="|";OFS=FS} {base=$1;gsub(/.*\//,"",base);print $1,base,$2} deletedirs-$module deletefiles-$module
-        # or
-        # { $0 "\t\t" basename($0) }
-        # function basename(pn) {
-        #     sub(/^.*\//, "", pn)
-        #     return pn
-        # } master-deletedirs | sort -u > master-fixdirtimestamps
-
-        #awk '{ basename($0)	}
-        #function dirname (pathname){
-        #	if (!sub(/\/[^\/]*\/?$/, "", pathname))
-        #		return "."
-        #	else if (pathname != "")
-        #		return pathname
-        #	else
-        #		return "/"
-        #}'
+        # Extract dirnames of every file and dir in the delete lists, and all of their parents.
+        awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
+            deletefiles-$module deletedirs-$module | sort -u > updatetimestamps-$module
+        cat updatetimestamps-$module >> master-updatetimestamps
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
@@ -447,6 +432,9 @@ for module in $MODULES; do
         linecount=$(wc -l < updatedfiles-$module)
         totallines=$((totallines+linecount))
         db2f "Size Changed:          %7d files.\n" $linecount
+
+        linecount=$(wc -l < updatetimestamps-$module)
+        db2f "Timestamps to restore: %7d files.\n" $linecount
 
         linecount=$(wc -l < checksumfailed-$module)
         totallines=$((totallines+linecount))
@@ -529,8 +517,12 @@ else
 fi
 
 if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
+
     echo KEEPDIRTIMES not yet supported.
-    # XXX call rsync again with just the dirs which we might have changed by deleting
+    # XXX call rsync again with just the dirs which we might have changed by
+    # deleting, and all of their parents.
+    # Or call it with all dirs in the modules given a command line option.
+    # Implement dirname in awk.
 fi
 
 
