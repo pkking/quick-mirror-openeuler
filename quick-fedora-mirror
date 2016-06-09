@@ -217,7 +217,7 @@ fi
 
 # Make a temp dir and clean it up unless we're doing a lot of debugging
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
-if (( VERBOSE <= 6 )); then
+if (( VERBOSE <= 8 )); then
     trap "rm -rf $tempd" EXIT
 fi
 cd $tempd
