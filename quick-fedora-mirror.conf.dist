@@ -50,6 +50,7 @@ TIMEFILE=
 # This won't ensure that timestamps are always up to date, but its good enough
 # if you don't modify your repository locally.  Maintaining directory
 # timestamps isn't important for mirroring in any case.
+# Note: Not yet implemented
 # KEEPDIRTIMES=
 #
 # Verbosity level
@@ -64,4 +65,9 @@ TIMEFILE=
 # 8 - Shell script trace
 # VERBOSE=0
 
-
+# mktemp will be called after this file is sourced to make a temporary
+# directory.  This directory can contain a large amount of data, and that data
+# is specified by the server.  If your /tmp is small and you are concerned
+# about the server potentially sending extra-huge files and filling things up,
+# you can set TMPDIR here.
+# TMPDIR=
