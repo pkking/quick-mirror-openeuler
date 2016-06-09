@@ -318,7 +318,7 @@ for module in $MODULES; do
     fi
 
     flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
-    if [[ $flversion != '2' ]]; then
+    if [[ "$flversion" != '2' ]]; then
         (>&2 echo File list version from the mirror cannot be processed by this script.
         echo Skipping $module.)
         continue
