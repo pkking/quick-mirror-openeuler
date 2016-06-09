@@ -519,7 +519,9 @@ if [[ -s master-deletefiles ]]; then
         echo
     else
         db2 Removing $linecount stale files.
-        (pushd $DESTD; xargs -i rm -f '{}'; popd) < master-deletefiles
+        xopts=()
+        (( VERBOSE >= 4 )) && xopts=(-t)
+        tr '\n' '\0' < master-deletefiles | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
         deletedsomething=1
     fi
 else
@@ -527,6 +529,7 @@ else
 fi
 
 if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
+    echo KEEPDIRTIMES not yet supported.
     # XXX call rsync again with just the dirs which we might have changed by deleting
 fi
 
