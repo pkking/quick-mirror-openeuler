@@ -36,7 +36,7 @@ def sha1(fname):
     return sha1.hexdigest()
 
 
-def recursedir(path='.', skip=[]):
+def recursedir(path='.', skip=[], alwaysskip=['.~tmp~']):
     """Just like scandir, but recursively.
 
     Will skip everything in the skip array, but only at the top level
@@ -45,8 +45,11 @@ def recursedir(path='.', skip=[]):
     for entry in scandir(path):
         if entry.name in skip:
             continue
+        if entry.name in alwaysskip:
+            continue
         if entry.is_dir(follow_symlinks=False):
-            for rentry in recursedir(entry.path):
+            # Don't pass skip here, because we only skip in the top level
+            for rentry in recursedir(entry.path, alwaysskip=alwaysskip):
                 yield rentry
         yield entry
 
