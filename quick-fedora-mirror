@@ -295,9 +295,6 @@ rmdir * 2> /dev/null
 # File list generation
 # ====================
 for module in $MODULES; do
-    sep
-    db2 Processing $module
-
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
 
@@ -311,6 +308,9 @@ for module in $MODULES; do
         db2 No change in file list mtime.  Skipping $module.
         continue
     fi
+
+    sep
+    db2 Processing $module
 
     if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
         echo "Changes in file list since last run:"
