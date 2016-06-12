@@ -31,8 +31,6 @@ finish () {
     exit 0
 }
 
-# XXX investigate using --compare-dest/--link-dest: specify all mirrored
-# modules with --link-dest to ensure that all possible hardlinking is done.
 do_rsync () {
     # Options: source, destination.
     # The name of an array containing additional options.
@@ -122,7 +120,7 @@ while [[ $# > 0 ]]; do
                 exit 1
             fi
             ;;
-        -d)
+        -d) # Debugging
             verboseopt=$2
             shift
             ;;
@@ -524,7 +522,6 @@ if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
     # Or call it with all dirs in the modules given a command line option.
     # Implement dirname in awk.
 fi
-
 
 # State saving
 # ============
