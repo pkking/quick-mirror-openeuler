@@ -1,5 +1,5 @@
 #!/bin/zsh
-LANG=C
+export LANG=C
 # Simple script to grab the file list from Fedora and rsync everything that's
 # changed since the last time we pulled.
 #
