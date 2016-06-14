@@ -39,11 +39,11 @@ TIMEFILE=
 
 # Array of default options to pass to rsync
 # Will be modified automatically according to VERBOSITY level; no need to set
-# -q or -v here
+# -q, -v or --info here.
 # You can add excludes here, but the script will always detect those files as
 # missing and will add them back to the file list.  This may generate
 # complaints from rsync, but should not cause any problems.
-# RSYNCOPTS=(-aSH -f 'R .~tmp~' --delete-delay --delay-updates)
+# RSYNCOPTS=RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
 
 # Define KEEPDIRTIMES (to anything) to make a third rsync call which restores
 # the timestamps of any directories which were modified after file removal.
