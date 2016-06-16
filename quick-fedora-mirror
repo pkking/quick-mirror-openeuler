@@ -81,12 +81,6 @@ do_rsync () {
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
-        # XXX Dead code?
-        if [[ $VERBOSE -gt 1 && -f $errlog ]]; then
-            (>&2 cat $errlog)
-            rm $errlog
-        fi
-
         db2 rsync failed: sleeping for $sleep
         sleep $sleep
         sleep=$(( sleep*2 ))
@@ -215,6 +209,10 @@ fi
 
 # Make a temp dir and clean it up unless we're doing a lot of debugging
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
+if [[ $? -ne 0 ]]; then
+    (>&2 echo "Creating temporary directory failed?")
+    exit 1
+fi
 if (( VERBOSE <= 8 )); then
     trap "rm -rf $tempd" EXIT
 fi
@@ -268,7 +266,7 @@ for module in $MODULES; do
     flname=${FILELIST/'$mdir'/$moduledir}
 
     mkdir $moduledir
-    rm -f $flname
+    # rm -f $flname # XXX Why was this here?
     # ZSHISM (assign assoc. array value)
     fltimes[$module]=0
     if [[ -f $DESTD/$moduledir/$flname ]]; then
