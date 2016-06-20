@@ -468,7 +468,8 @@ db2 Transferring $linecount files.
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
 
 if [[ $? -ne 0 ]]; then
-    (>&2 echo rsync finished with nonzero exit status.)
+    (>&2 echo rsync finished with nonzero exit status.  Will not delete anything.)
+    skipdelete=1
 fi
 
 # Local dir/file deletion
