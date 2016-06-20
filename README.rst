@@ -118,6 +118,16 @@ hardlinks.  Most of the hardlinks are between:
 
 * fedora-alt and fedora-enchilada.
 
+The Hardlinker
+==============
+
+Also included is ``quick-fedora-hardlink`` which, when run on a quiescent
+repository, will find identical files and hardlink them.  This duplicates
+functionality of the existing hardlink tool, but can work more quickly by
+exploiting knowlege of the Fedora repositories, namely that all files which are
+hardlinkable will have identical basenames, identical permissions and identical
+inode ctimes.
+
 Server
 ======
 
