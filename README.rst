@@ -106,17 +106,9 @@ Adding a module
 
 If you have to add a module after the fact (i.e. you already have
 fedora-enchilada and you want to add fedora-alt), note that rsync will not pick
-up any hardlinks.  You can of course do the download and then run hardlink
-afterwards, or do a full transfer (i.e. using ``-t 0``, though this will not be
-quick).  To minimize the time spent counting files, you can use a configuration
-file which specifies only the modules with which the new module shares
-hardlinks.  Most of the hardlinks are between:
-
-* fedora-archive and fedora-enchilada
-
-* fedora-archive and fedora-secondary
-
-* fedora-alt and fedora-enchilada.
+up any hardlinks.  You can of course do the download and then run the
+hardlinker afterwards (see below), or do a full transfer (i.e. using ``-t 0``, though this
+will most likely be far slower.
 
 The Hardlinker
 ==============
@@ -127,6 +119,27 @@ functionality of the existing hardlink tool, but can work more quickly by
 exploiting knowlege of the Fedora repositories, namely that all files which are
 hardlinkable will have identical basenames, identical permissions and identical
 inode ctimes.
+
+The hardlinker is written in python, though a zsh version with less
+functionality is also in the repository.
+
+Options
+-------
+-c  Specify the configuration file to use.  Normally it is found using the same
+    method that the client uses.
+
+-n, --dry-run  List what would be hardlinked, but don't actually hardlink
+    anything.
+
+--no-ctime  Do not assume that all hardlinkable files will have the same ctime
+    in the file lists.  If the content on the master mirrors is fully
+    hardlinked and the file lists are up to date, the hardlinked files will all have
+    exactly the same ctime entries in the file lists.  Using this knowledge
+    permits a significant optimization, but if the server content isn't fully
+    hardlinked then some opportunities will be missed.
+
+    This is most useful when actually run on the master mirrors to ensure that
+    the master content is synchronized.
 
 Server
 ======
