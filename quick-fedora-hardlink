@@ -43,6 +43,8 @@ def options_parse():
                    help='Just print what would be done without linking anything.')
     p.add_argument('-p', '--progress', action='store_true',
                    help='Show progress information on stderr.')
+    p.add_argument('--no-ctime', action='store_true',
+                   help='Do not skip files which have different ctimes in the file lists.')
 
     opts = p.parse_args()
 
@@ -106,7 +108,7 @@ def skip_to_files(f):
     return False
 
 
-def process_one_filelist(filelist, module, candidates):
+def process_one_filelist(filelist, module, candidates, check_ctime=True):
     with open(filelist) as f:
         skip_to_files(f)
 
@@ -118,10 +120,16 @@ def process_one_filelist(filelist, module, candidates):
             if fields[1] != 'f':
                 continue
 
+            ctime = fields[0]
             size = fields[2]
             pathname = fields[3]
             filename = os.path.basename(pathname)
-            key = filename + size
+
+            if check_ctime:
+                key = filename + size + ctime
+            else:
+                key = filename + size
+
             # Not using os.path.join because it's slow
             p = module + '/' + pathname
             if key in candidates:
@@ -218,9 +226,20 @@ def do_hardlink(target, link):
 
 def process_one_candidate(target, l, skip=False):
     """Process a candidate tuple."""
-    tstat = os.stat(target)
+    linked = 0
+    saved = 0
+    try:
+        tstat = os.stat(target)
+    except os.error:
+        print('\rCould not find {}.  File list out of date?'.format(target))
+        return (0, 0)
+
     for candidate in l:
-        cstat = os.stat(candidate)
+        try:
+            cstat = os.stat(candidate)
+        except os.error:
+            print('\rCould not find {}.  File list out of date?'.format(candidate))
+            continue
 
         # Compare inode
         if tstat.st_ino == cstat.st_ino:
@@ -234,21 +253,37 @@ def process_one_candidate(target, l, skip=False):
 
         if skip:
             print('\rWould hardlink {} and {}'.format(target, candidate))
+            linked += 1
+            saved += tstat.st_size
             continue
 
         do_hardlink(target, candidate)
-        print('\rHardlink {} and {}'.format(target, candidate))
+        linked += 1
+        saved += tstat.st_size
+
+        # print('\rHardlink {} and {}'.format(target, candidate))
+
+    return (linked, saved)
 
 
 def process_candidates(candidates, skip=False):
     total = len(candidates)
     count = 1
+    linkedtotal = 0
+    savedtotal = 0
+
     for _, candidate in candidates.iteritems():
         target = candidate.pop(0)
-        sys.stdout.write('\r[{:2.2%}] - {}'.format((count / total), target))
-        sys.stderr.flush()
-        process_one_candidate(target, candidate, skip=skip)
+        if count % 25 == 0:
+            sys.stdout.write('\r{:7} ({:2.2%}) processed - {:5} linked - {:.2f}GB saved\033[K'
+                             .format(count, (count / total), linkedtotal, (savedtotal / 1024 ** 3)))
+            sys.stdout.flush()
+        (linked, saved) = process_one_candidate(target, candidate, skip=skip)
+        linkedtotal += linked
+        savedtotal += saved
         count += 1
+
+    return (linkedtotal, savedtotal)
 
 
 def main():
@@ -259,9 +294,13 @@ def main():
     print('Processing file lists in {}:'.format(opts.destd))
     c = generate_candidates(filelist=opts.filelist)
     trim_candidates(c)
-    print('Found {} tuples of potentially hardlinkable files.'.format(len(c)))
-    process_candidates(c, skip=opts.dry_run)
     print()
+    print('Found {} tuples of potentially hardlinkable files.'.format(len(c)))
+    print()
+    (linked, saved) = process_candidates(c, skip=opts.dry_run)
+    print('\n')
+    print('Files linked: {}'.format(linked))
+    print('Space saved:  {:.2}GB'.format(saved / 1024 ** 3))
 
 
 if __name__ == '__main__':
