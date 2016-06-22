@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Note: this is only an example of how you'd call create-filelist.  Edit to fit
-# your requirements.
+# your requirements.  Note that you must supply a valid path for the lockfile,
+# and it must be outside of your repository unless you want that lockfile to
+# show up in your file lists.
 
 # Takes a list of module names.  Generates file lists for all of them and them
 # moves them into place at once.  If you are creating hardlinks between rsync
@@ -22,7 +24,8 @@ trap "rm -rf $tmpd" EXIT
 cd $tmpd
 
 # A single lockfile for everything we're modifying
-LOCKFILE=.lock.create-filelist
+# This really should be outside of your file repository.
+LOCKFILE=/XXX/path/.lock.create-filelist
 
 # The directory where all of the modules live
 TOPD=/srv/mirror/pub
@@ -43,7 +46,7 @@ TIMELIST='fullfiletimelist-$mod'
 
     # Create all of the filelists
     for mod in $mods; do
-        $CREATE -c -s -d $TOPD/$mod-f fl-$mod -t tl-$mod
+        $CREATE -c -s -d $TOPD/$mod -f fl-$mod -t tl-$mod
     done
 
     # Now diff the file lists and delete the ones which didn't change
