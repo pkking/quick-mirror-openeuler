@@ -290,7 +290,7 @@ def process_candidates(candidates, skip=False):
 
         if count % 25 == 0:
             sys.stdout.write('\r{:7} ({:2.2%}) processed - {} linked '
-                             '- {:.2f}GB saved - about {:.1f} hours remaining\033[K'
+                             '- {:.2f}GB saved - about {:.2f} hours remaining\033[K'
                              .format(count,
                                      (count / total),
                                      linkedtotal,
