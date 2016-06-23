@@ -323,7 +323,7 @@ def main():
     (linked, saved) = process_candidates(c, skip=opts.dry_run)
     print('\n')
     print('Files linked: {}'.format(linked))
-    print('Space saved:  {:.2}GB'.format(saved / 1024 ** 3))
+    print('Space saved:  {:.2f}GB'.format(saved / 1024 ** 3))
     print('Linking took: {:.1f} hours'.format((time.time() - timestart) / 60 ** 2))
 
 
