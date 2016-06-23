@@ -22,10 +22,12 @@ from __future__ import print_function, division
 #   module together when linking occurs.
 
 import argparse
+# import fcntl
 import os
 import re
 import sys
 import tempfile
+import time
 
 
 class g:
@@ -271,12 +273,30 @@ def process_candidates(candidates, skip=False):
     count = 1
     linkedtotal = 0
     savedtotal = 0
+    lasttime = time.time()
+    timeleftestimate = float('NaN')
+    lastspeed = 0
+    averagespeed = 25  # Reasonable value to start with
+    smooth = 0.1
 
     for _, candidate in candidates.iteritems():
         target = candidate.pop(0)
+        if count % 1000 == 0:
+            now = time.time()
+            lastspeed = 1000 / (now - lasttime)
+            lasttime = now
+            averagespeed = smooth * lastspeed + (1 - smooth) * averagespeed
+            timeleftestimate = ((total - count) / averagespeed) / 60 ** 2  # In hours
+
         if count % 25 == 0:
-            sys.stdout.write('\r{:7} ({:2.2%}) processed - {:5} linked - {:.2f}GB saved\033[K'
-                             .format(count, (count / total), linkedtotal, (savedtotal / 1024 ** 3)))
+            sys.stdout.write('\r{:7} ({:2.2%}) processed - {} linked '
+                             '- {:.2f}GB saved - about {:.1f} hours remaining\033[K'
+                             .format(count,
+                                     (count / total),
+                                     linkedtotal,
+                                     (savedtotal / 1024 ** 3),
+                                     timeleftestimate)
+                             )
             sys.stdout.flush()
         (linked, saved) = process_one_candidate(target, candidate, skip=skip)
         linkedtotal += linked
@@ -291,16 +311,20 @@ def main():
     config_read(opts)
     config_check(opts)
     os.chdir(opts.destd)
+    timestart = time.time()
     print('Processing file lists in {}:'.format(opts.destd))
     c = generate_candidates(filelist=opts.filelist)
     trim_candidates(c)
     print()
-    print('Found {} tuples of potentially hardlinkable files.'.format(len(c)))
+    print('Found {} tuples of potentially hardlinkable files in {:.1f} minutes.'
+          .format(len(c), (time.time() - timestart) / 60))
     print()
+    timestart = time.time()
     (linked, saved) = process_candidates(c, skip=opts.dry_run)
     print('\n')
     print('Files linked: {}'.format(linked))
     print('Space saved:  {:.2}GB'.format(saved / 1024 ** 3))
+    print('Linking took: {:.1f} hours'.format((time.time() - timestart) / 60 ** 2))
 
 
 if __name__ == '__main__':
