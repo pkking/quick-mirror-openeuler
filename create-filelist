@@ -63,7 +63,7 @@ def parseopts():
     p.add_argument('-C', '--checksum-file', action='append', dest='checksum_files',
                    help='Include checksums of all instances of the specified file.')
     p.add_argument('-s', '--skip', action='store_true',
-                   help='Skip the --filelist file in the top directory')
+                   help='Skip the --timelist file in the top directory')
     p.add_argument('-S', '--skip-file', action='append', dest='skip_files',
                    help='Skip the specified file in the top directory.')
 
