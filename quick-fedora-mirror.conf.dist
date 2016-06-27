@@ -53,10 +53,11 @@ TIMEFILE=
 # Note: Not yet implemented
 # KEEPDIRTIMES=
 
-# DEFINE CHECKIN (to anything) to perform a mirrormanager checkin at the
-# completion of the run if rsync succeeded without error.
+# DEFINE CHECKIN_SITE and CHECKIN_PASSWORD to perform a mirrormanager checkin
+# at the completion of the run if rsync succeeded without error.
 # Note: Not yet implemented
-# CHECKIN=
+# CHECKIN_SITE=
+# CHECKIN_PASSWORD=
 
 # Verbosity level
 # 0 - quiet
