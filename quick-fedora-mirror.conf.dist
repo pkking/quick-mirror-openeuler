@@ -52,7 +52,12 @@ TIMEFILE=
 # timestamps isn't important for mirroring in any case.
 # Note: Not yet implemented
 # KEEPDIRTIMES=
-#
+
+# DEFINE CHECKIN (to anything) to perform a mirrormanager checkin at the
+# completion of the run if rsync succeeded without error.
+# Note: Not yet implemented
+# CHECKIN=
+
 # Verbosity level
 # 0 - quiet
 # 1 - start and end times
