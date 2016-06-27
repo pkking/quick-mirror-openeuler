@@ -43,10 +43,10 @@ def options_parse():
     p.add_argument('-d', '--debug', help='Debug level.')
     p.add_argument('-n', '--dry-run', action='store_true',
                    help='Just print what would be done without linking anything.')
-    p.add_argument('-p', '--progress', action='store_true',
-                   help='Show progress information on stderr.')
     p.add_argument('--no-ctime', action='store_true',
                    help='Do not skip files which have different ctimes in the file lists.')
+    p.add_argument('-v', '--verbose', action='store_true',
+                   help='Print the source and dest of each hardlink created.')
 
     opts = p.parse_args()
 
@@ -69,7 +69,21 @@ def options_parse():
 
     opts.filelist = 'fullfiletimelist-$mdir'
 
+    opts.check_ctime = True
+    if opts.no_ctime:
+        opts.check_ctime = False
+
     return opts
+
+
+def uprint(string):
+    """Unbuffered print without advancing the cursor.
+
+    Writes to stderr, prefixing with \r and clearing the rest of the line.
+    Explicitly add \n if you want to advance the line.
+    """
+    sys.stderr.write('\r' + string + '\033[K')
+    sys.stderr.flush()
 
 
 def config_read(opts):
@@ -146,7 +160,7 @@ def trim_candidates(candidates):
         del candidates[k]
 
 
-def generate_candidates(filelist='fullfiletimelist-$mdir'):
+def generate_candidates(filelist='fullfiletimelist-$mdir', check_ctime=True):
     """Process filelists in the current directory.
 
     Looks for all filelists in the current directory and processes them all.
@@ -162,7 +176,7 @@ def generate_candidates(filelist='fullfiletimelist-$mdir'):
             continue
 
         print('  {}'.format(fl))
-        process_one_filelist(fl, module, candidates)
+        process_one_filelist(fl, module, candidates, check_ctime=check_ctime)
 
     return candidates
 
@@ -174,7 +188,7 @@ def files_differ(f1, f2):
     our purposes.
     """
     bufsize = 8 * 1024
-    # print('\rCompare {}, {}'.format(f1, f2))
+    # uprint('Compare {}, {}\n'.format(f1, f2))
     with open(f1, 'rb') as fp1, open(f2, 'rb') as fp2:
         while True:
             b1 = fp1.read(bufsize)
@@ -226,26 +240,28 @@ def do_hardlink(target, link):
         sys.exit(1)
 
 
-def process_one_candidate(target, l, skip=False):
+def process_one_candidate(target, l, skip=False, verbose=False):
     """Process a candidate tuple."""
     linked = 0
+    alreadylinked = 0
     saved = 0
     try:
         tstat = os.stat(target)
     except os.error:
-        print('\rCould not find {}.  File list out of date?'.format(target))
-        return (0, 0)
+        uprint('Could not find {}.  File list out of date?\n'.format(target))
+        return (0, 0, 0)
 
     for candidate in l:
         try:
             cstat = os.stat(candidate)
         except os.error:
-            print('\rCould not find {}.  File list out of date?'.format(candidate))
+            uprint('Could not find {}.  File list out of date?\n'.format(candidate))
             continue
 
         # Compare inode
         if tstat.st_ino == cstat.st_ino:
             # debug that they're already linked
+            alreadylinked += 1
             continue
 
         # Compare contents
@@ -254,7 +270,7 @@ def process_one_candidate(target, l, skip=False):
             continue
 
         if skip:
-            print('\rWould hardlink {} and {}'.format(target, candidate))
+            uprint('Would hardlink {} and {}\n'.format(target, candidate))
             linked += 1
             saved += tstat.st_size
             continue
@@ -263,21 +279,24 @@ def process_one_candidate(target, l, skip=False):
         linked += 1
         saved += tstat.st_size
 
-        # print('\rHardlink {} and {}'.format(target, candidate))
+        if verbose:
+            uprint('Hardlink {}\n    and {}\n'.format(target, candidate))
 
-    return (linked, saved)
+    return (linked, alreadylinked, saved)
 
 
-def process_candidates(candidates, skip=False):
+def process_candidates(candidates, skip=False, verbose=False):
     total = len(candidates)
     count = 1
+    alreadylinkedtotal = 0
     linkedtotal = 0
     savedtotal = 0
     lasttime = time.time()
-    timeleftestimate = float('NaN')
+    timeleftestimate = 999
     lastspeed = 0
     averagespeed = 25  # Reasonable value to start with
-    smooth = 0.1
+    smooth = 0.25
+    left = ''
 
     for _, candidate in candidates.iteritems():
         target = candidate.pop(0)
@@ -286,20 +305,29 @@ def process_candidates(candidates, skip=False):
             lastspeed = 1000 / (now - lasttime)
             lasttime = now
             averagespeed = smooth * lastspeed + (1 - smooth) * averagespeed
-            timeleftestimate = ((total - count) / averagespeed) / 60 ** 2  # In hours
+            timeleftestimate = ((total - count) / averagespeed)  # In seconds
+            if timeleftestimate < 60:
+                left = '{:.1f}s'.format(timeleftestimate)
+            elif timeleftestimate < (60 ** 2):
+                left = '{:.1f}m'.format(timeleftestimate / 60)
+            else:
+                left = '{:.1f}h'.format(timeleftestimate / (60 ** 2))
 
         if count % 25 == 0:
-            sys.stdout.write('\r{:7} ({:2.2%}) processed - {} linked '
-                             '- {:.2f}GB saved - about {:.2f} hours remaining\033[K'
-                             .format(count,
-                                     (count / total),
-                                     linkedtotal,
-                                     (savedtotal / 1024 ** 3),
-                                     timeleftestimate)
-                             )
-            sys.stdout.flush()
-        (linked, saved) = process_one_candidate(target, candidate, skip=skip)
+            # Total (pct) - existing links - new links - saved - time estimate
+            uprint('{:7} tuples ({:2.2%})'
+                   ' - links: ({} exist, {} new)'
+                   ' - {:.2f}GB saved - ~{} left'
+                   .format(count,
+                           (count / total),
+                           alreadylinkedtotal,
+                           linkedtotal,
+                           (savedtotal / 1024 ** 3),
+                           left)
+                   )
+        (linked, alreadylinked, saved) = process_one_candidate(target, candidate, skip=skip, verbose=verbose)
         linkedtotal += linked
+        alreadylinkedtotal += alreadylinked
         savedtotal += saved
         count += 1
 
@@ -313,18 +341,22 @@ def main():
     os.chdir(opts.destd)
     timestart = time.time()
     print('Processing file lists in {}:'.format(opts.destd))
-    c = generate_candidates(filelist=opts.filelist)
+    c = generate_candidates(filelist=opts.filelist, check_ctime=opts.check_ctime)
     trim_candidates(c)
     print()
     print('Found {} tuples of potentially hardlinkable files in {:.1f} minutes.'
           .format(len(c), (time.time() - timestart) / 60))
     print()
     timestart = time.time()
-    (linked, saved) = process_candidates(c, skip=opts.dry_run)
+    (linked, saved) = process_candidates(c, skip=opts.dry_run, verbose=opts.verbose)
+    elapsed = (time.time() - timestart) / 60
     print('\n')
     print('Files linked: {}'.format(linked))
     print('Space saved:  {:.2f}GB'.format(saved / 1024 ** 3))
-    print('Linking took: {:.1f} hours'.format((time.time() - timestart) / 60 ** 2))
+    if elapsed < 60:
+        print('Linking took: {:.1f} minutes'.format(elapsed))
+    else:
+        print('Linking took: {:.1f} hours'.format(elapsed / 60))
 
 
 if __name__ == '__main__':
