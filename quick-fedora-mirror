@@ -162,8 +162,11 @@ VERBOSE=0
 DESTD=
 TIMEFILE=
 
-REMOTE=rsync://dl.fedoraproject.org
+CHECKIN_HOST=$(hostname)
+CURL=/usr/bin/rsync
 FILELIST='fullfiletimelist-$mdir'
+MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/checkin
+REMOTE=rsync://dl.fedoraproject.org
 RSYNC=/usr/bin/rsync
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
@@ -263,10 +266,9 @@ typeset -A fltimes
 for module in $MODULES; do
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
+    mkdir $moduledir
     flname=${FILELIST/'$mdir'/$moduledir}
 
-    mkdir $moduledir
-    # rm -f $flname # XXX Why was this here?
     # ZSHISM (assign assoc. array value)
     fltimes[$module]=0
     if [[ -f $DESTD/$moduledir/$flname ]]; then
@@ -319,11 +321,6 @@ for module in $MODULES; do
         echo Skipping $module.)
         continue
     fi
-
-    # Extract Files section:
-
-    # Extract Checksums section:
-    # awk -F '\t' '/^\[Checksums/ {s=1; next} /^$/ {s=0} {if (s) print $0}' < $FILELIST
 
     db3 Extracting file and directory lists.
 
@@ -445,9 +442,10 @@ for module in $MODULES; do
     db2 After removing duplicates, $linecount files and dirs were added to the transfer list.
 
     # Clean up a bit.
-    if (( VERBOSE <= 4 )); then
-        rm *-$module
-    fi
+    # XXX We need at least the dirlists for the checkin
+    #if (( VERBOSE <= 4 )); then
+    #    rm *-$module
+    #fi
 done
 
 if [[ ! -e master-transferlist ]]; then
@@ -468,8 +466,9 @@ db2 Transferring $linecount files.
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
 
 if [[ $? -ne 0 ]]; then
-    (>&2 echo rsync finished with nonzero exit status.  Will not delete anything.)
+    (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
     skipdelete=1
+    rsyncfail=1
 fi
 
 # Local dir/file deletion
@@ -537,6 +536,78 @@ if [[ -z $skiptimestamp ]]; then
     fi
 else
     db2 Skipping timestamp save.
+    finish
 fi
+
+# Mirrormanager Checkin
+# =====================
+# At this point we know that we had a clean run with no complaints from rsync.
+# So for each module we mirrored, the file list is correct.
+# This means (assuming that no excludes are being passed) that the
+# alldirs-$module file is accurate and we can simply report its contents to
+# mirrormanager.
+if [[ -z $CHECKIN_SITE ]]; then
+    finish
+fi
+
+db2 Performing mirrormanager checkin
+mm=mirrormanager-payload
+
+# The json produced by report_mirror will start with a bracket, followed by
+# info for each module, followed by some data relating to the host and site
+# being reported.
+echo '{' > $mm
+
+for module in $MODULES; do
+    moduledir=$MODULEMAPPING[$module]
+
+    # The beginning of the json bit
+    cat >>$mm <<EOF
+    "$module": {
+        "dirtree": {
+EOF
+
+    # Output the data for each directory.  MM doesn't want the
+    # directory name.
+    for l in $(cat alldirs-$module); do
+        cat >>$mm <<EOF
+            "${l/$moduledir\/}": {},
+EOF
+    done
+
+    # The data sent by report_mirror always includes a blank directory; add it
+    # manually here which conveniently means we don't have to deal with the
+    # trailing comma.
+    cat >>$mm <<EOF
+            "": {}
+        },
+        "enabled": "1"
+    },
+EOF
+done
+
+cat >>$mm <<EOF
+    "global": {
+        "enabled": "1",
+        "server": "$MIRRORMANAGER"
+    },
+    "host": {
+        "enabled": "1",
+        "name": "$CHECKIN_HOST"
+    },
+    "site": {
+        "enabled": "1",
+        "name": "$CHECKIN_SITE",
+        "password": "$CHECKIN_PASSWORD"
+    },
+    "stats": {},
+    "version": 0
+}
+EOF
+
+# XXX gzip the payload and change the content type to application/gzip
+
+# Now actually upload the payload
+#$CURL -H "Content-Type: application/json" --data @$mm $MIRRORMANAGER
 
 finish
