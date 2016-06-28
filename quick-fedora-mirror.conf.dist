@@ -37,6 +37,9 @@ TIMEFILE=
 # rsync binary
 # RSYNC=/usr/bin/rsync
 
+# curl binary (only if MirrorManager checkins are enabled; see below).
+# CURL=/usr/bin/curl
+
 # Array of default options to pass to rsync
 # Will be modified automatically according to VERBOSITY level; no need to set
 # -q, -v or --info here.
@@ -55,9 +58,12 @@ TIMEFILE=
 
 # DEFINE CHECKIN_SITE and CHECKIN_PASSWORD to perform a mirrormanager checkin
 # at the completion of the run if rsync succeeded without error.
-# Note: Not yet implemented
+# CHECKIN_HOST will default to the output of the hostname command.   Set it if necessary.
+# This requires that "curl" be installed; see CURL above if it's not in /usr/bin.
+# Note: Not yet implemented; mirrormanager does not yet support this.
 # CHECKIN_SITE=
 # CHECKIN_PASSWORD=
+# CHECKIN_HOST=
 
 # Verbosity level
 # 0 - quiet
