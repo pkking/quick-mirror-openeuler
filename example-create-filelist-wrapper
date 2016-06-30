@@ -61,14 +61,16 @@ TIMELIST='fullfiletimelist-$mod'
         # If a file list exsts and doesn't differ from what we just generated,
         # delete the latter.
         if [[ -f $currentfl ]] && diff -q fl-$mod $currentfl > /dev/null; then
-            rm -f $fl
+            rm -f fl-$mod
         fi
         if [[ -f $currenttl ]] && diff -q tl-$mod $currenttl > /dev/null; then
-            rm -f $fl
+            rm -f tl-$mod
         fi
     done
 
     # And finally, move all of the files which need updating into place
+    # This is done separately to be slightly more "atomic".  This still waits
+    # for the copy, though.
     for mod in $mods; do
         currentfl=$TOPD/$mod/${FILELIST/'$mod'/$mod}
         currenttl=$TOPD/$mod/${TIMELIST/'$mod'/$mod}
