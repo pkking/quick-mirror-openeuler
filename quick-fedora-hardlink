@@ -295,7 +295,7 @@ def process_candidates(candidates, skip=False, verbose=False):
     timeleftestimate = 999
     lastspeed = 0
     averagespeed = 25  # Reasonable value to start with
-    smooth = 0.25
+    smooth = 0.2  # Magic value that "feels" right....
     left = ''
 
     for _, candidate in candidates.iteritems():
