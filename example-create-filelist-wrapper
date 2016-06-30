@@ -20,6 +20,10 @@ fi
 CREATE=/usr/local/bin/create-filelist
 
 tmpd=$(mktemp -d -t create-filelist.XXXXXXXXXX)
+if [[ $? -ne 0 ]]; then
+    (>&2 echo "Creating temporary directory failed?")
+    exit 1
+fi
 trap "rm -rf $tmpd" EXIT
 cd $tmpd
 
