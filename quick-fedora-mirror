@@ -322,6 +322,15 @@ for module in $MODULES; do
         continue
     fi
 
+    # Extract checksums up front in order to use that as a syntax check on the file list.
+    awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
+
+    if [[ ! -s checksums-$module ]]; then
+        (>&2 echo "No checksums section.  Corrupted file list?"
+        echo Skipping $module.))
+        continue
+    fi
+
     db3 Extracting file and directory lists.
 
     # All files in the remote repository.
@@ -400,9 +409,6 @@ for module in $MODULES; do
         # Find files which have changed size
         sort allfilesizes-$module localfilesizes-$module | uniq -u | awk -F '\t' '{print $1}' | uniq -d > updatedfiles-$module
         cat updatedfiles-$module >> transferlist-$module
-
-        # Extract checksums
-        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
 
         pushd $DESTD > /dev/null 2>&1
         sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null | grep -i 'failed$' | awk -F: '{print $1}' > $tempd/checksumfailed-$module
