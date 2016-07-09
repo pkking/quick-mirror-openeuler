@@ -327,7 +327,7 @@ for module in $MODULES; do
 
     if [[ ! -s checksums-$module ]]; then
         (>&2 echo "No checksums section.  Corrupted file list?"
-        echo Skipping $module.))
+        echo Skipping $module.)
         continue
     fi
 
