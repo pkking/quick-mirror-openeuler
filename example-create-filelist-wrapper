@@ -124,22 +124,28 @@ cd $tmpd
         fi
     done
 
-    # And finally, move all of the files which need updating into place
-    # This is done separately to be slightly more "atomic".  This still waits
-    # for the copy, though.
+    # Now we have the new file lists but in a temporary directory which
+    # probably isn't on the same filesystem.  Copy them to temporary files in
+    # the right place.
     for mod in $MODS; do
         currentfl=$TOPD/$mod/${FILELIST/'$mod'/$mod}
         currenttl=$TOPD/$mod/${TIMELIST/'$mod'/$mod}
         flname=$(basename $currentfl)
+        fldir=$(dirname $currentfl)
         tlname=$(basename $currenttl)
+        tldir=$(dirname $currenttl)
 
         if [[ -f $flname ]]; then
-            chmod 644 $flname
-            cp -p $flname $currentfl
+            tmpf=$(mktemp -p $fldir $flname.XXXXXXXXXX)
+            cp -p $flname $tmpf
+            chmod 644 $tmpf
+            mv $tmpf $currentfl
         fi
         if [[ -f $tlname ]]; then
-            chmod 644 $tlname
-            cp -p $tlname $currenttl
+            tmpf=$(mktemp -p $tldir $tlname.XXXXXXXXXX)
+            cp -p $tlname $tmpf
+            chmod 644 $tmpf
+            mv $tmpf $currenttl
         fi
     done
 
