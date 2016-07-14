@@ -494,6 +494,11 @@ if [[ ! -e master-transferlist ]]; then
     finish
 fi
 
+if [[ -n $MIRRORBUFFET ]]; then
+    echo DIRECTORY_SIZES.txt >> master-transferlist
+fi
+
+
 # The actual transfer
 # ===================
 sort -u master-transferlist > master-transferlist.sorted
