@@ -1,4 +1,5 @@
 #!/bin/zsh
+set +G
 export LANG=C
 IFS=$'\n'
 
