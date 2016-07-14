@@ -175,9 +175,9 @@ RSYNC=/usr/bin/rsync
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates)
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --fuzzy --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --fuzzy --delay-updates)
 fi
 
 MASTERMODULE=fedora-buffet
