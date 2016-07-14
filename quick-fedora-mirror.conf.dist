@@ -48,6 +48,11 @@ TIMEFILE=
 # complaints from rsync, but should not cause any problems.
 # RSYNCOPTS=RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
 
+# By default quick-fedora-mirror will try to detect and recover from an aborted
+# rsync run by moving any already downloaded files into place before
+# processing,  Define NORSYNCRECOVERY (to anything) to prevent this.
+# NORSYNCRECOVERY=
+
 # Define KEEPDIRTIMES (to anything) to make a third rsync call which restores
 # the timestamps of any directories which were modified after file removal.
 # This won't ensure that timestamps are always up to date, but its good enough

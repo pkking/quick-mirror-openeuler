@@ -385,8 +385,9 @@ for module in $MODULES; do
         awk -F '\t' '{if ($1 == "d") {print $2}}' < localfulllist-$module > localdirs-$module
 
         # Look for stray .~tmp~ dirs
-        grep '\.~tmp~' localdirs-$module > staletmpdirs-$module
-        cat staletmpdirs-$module
+        if [[ -z $NORSYNCRECOVERY ]]; then
+            grep '\.~tmp~' localdirs-$module > staletmpdirs-$module
+        fi
 
         if [[ -s staletmpdirs-$module ]]; then
             db2 Possibly aborted rsync run.  Cleaning up.
@@ -398,7 +399,7 @@ for module in $MODULES; do
             # Note that this _may_ leave a few files around which should not be
             # there.  They will of course be cleaned up at the next run.
             # XXX We could do better by comparing the stale files against the
-            #   to-be-fransferred list.
+            #   to-be-fransferred list, but it's probably not worth it.
             for dir in $(cat staletmpdirs-$module); do
                 pushd $DESTD/$dir
                 for file in *; do
