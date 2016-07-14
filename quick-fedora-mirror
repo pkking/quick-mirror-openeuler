@@ -121,7 +121,7 @@ while [[ $# > 0 ]]; do
             shift
             ;;
         -n)
-            skiprsync=1
+            rsyncdryrun=1
             skipdelete=1
             skiptimestamp=1
             ;;
@@ -500,7 +500,11 @@ db2 Transferring $linecount files.
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
 # the changed files without having to pull the entire huge file list.
-do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted
+extra=()
+if [[ -n $rsyncdryrun ]]; then
+    extra+=(-n)
+fi
+do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted extra
 
 if [[ $? -ne 0 ]]; then
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
