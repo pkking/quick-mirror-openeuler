@@ -116,10 +116,10 @@ cd $tmpd
 
         # If a file list exsts and doesn't differ from what we just generated,
         # delete the latter.
-        if [[ -f $currentfl ]] && diff -u $currentfl $flname; then # > /dev/null; then
+        if [[ -f $currentfl ]] && diff -q $currentfl $flname > /dev/null; then
             rm -f $flname
         fi
-        if [[ -f $currenttl ]] && diff -u $currenttl $tlname; then # > /dev/null; then
+        if [[ -f $currenttl ]] && diff -q $currenttl $tlname > /dev/null; then
             rm -f $tlname
         fi
     done
