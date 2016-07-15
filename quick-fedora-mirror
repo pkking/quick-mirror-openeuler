@@ -18,13 +18,18 @@ starttime=$(date +%s)
 starttime=$(($starttime-5))
 
 # Utility functions
-
 db1 () { (( VERBOSE >= 1 )) && echo $* }
 db2 () { (( VERBOSE >= 2 )) && echo $* }
 db3 () { (( VERBOSE >= 3 )) && echo '>>' $* }
 db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $* }
 sep () { (( VERBOSE >= 2 )) && echo '============================================================' }
 db2f () { (( VERBOSE >= 2 )) && printf $* }
+
+lock () {
+    eval "exec 9>>$1"
+    flock -n 9 && return 0
+    return 1
+}
 
 finish () {
     if (( $VERBOSE >= 1 )); then
