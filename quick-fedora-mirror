@@ -180,6 +180,7 @@ FFILELIST='fullfilelist'
 MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/checkin
 REMOTE=rsync://dl.fedoraproject.org
 RSYNC=/usr/bin/rsync
+WARNDELAY=$(( 60 * 60 * 24 ))
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
@@ -213,14 +214,6 @@ if [[ -z $TIMEFILE ]]; then
     (>&2 echo "You must define TIMEFILE in your configuration file ($configfile).")
 fi
 
-# At this point we can acquire the lock
-lock $TIMEFILE
-
-if [[ $? -gt 0 ]]; then
-    db4 Could not acquire lock.
-    exit 1
-fi
-
 # Find the previous mirror time, and backdate if necessary
 LASTTIME=0
 if [[ -r $TIMEFILE ]]; then
@@ -228,6 +221,22 @@ if [[ -r $TIMEFILE ]]; then
 fi
 if [[ -n $backdate ]]; then
     LASTTIME=$backdate
+fi
+
+# At this point we can acquire the lock
+lock $TIMEFILE
+if (( ? != 0 )); then
+    db4 Could not acquire lock.
+    # Maybe we haven't been able to mirror for some time....
+    delay=$(( starttime - LASTTIME ))
+    if [[ -n $backdate ]]; then
+        delay=0
+    fi
+
+    if (( delay > WARNDELAY )); then
+        (>&2 echo No completed run since $( date -d @$LASTTIME ).)
+    fi
+    exit 1
 fi
 
 # Make a temp dir and clean it up unless we're doing a lot of debugging
