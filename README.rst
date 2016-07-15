@@ -221,11 +221,11 @@ Non-Fedora Usage
 
 Note that you can of course run the server component in your own repository,
 but the clients will of course need to specify ``REMOTE``, ``MASTERMODULE`` and
-the ``MODULES`` array to map module names to directories.  The client also the
-assumption that all of the separate module are all subdirectories accessible
-from within a master module.  If you would like to use this code but those
-constraints don't fit your use case, please file an issue and I'll be happy to
-take a look.
+the ``MODULES`` array to map module names to directories.  The client also
+makes the assumption that all of the separate module are all subdirectories
+accessible from within a master module.  If you would like to use this code but
+those constraints don't fit your use case, please file an issue and I'll be
+happy to take a look.
 
 Be sure to run ``create-filelist`` after every repository change.  If you
 hardlink files between one module and another, you must update the file lists
