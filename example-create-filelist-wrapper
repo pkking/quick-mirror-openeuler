@@ -64,8 +64,6 @@ while [[ $# > 0 ]]; do
     shift
 done
 
-echo $MODS
-
 if [[ -z $LOCKFILE ]]; then
     (>&2 echo "Must specify LOCKFILE, either by editing the source or via the -l option."; usage)
     exit 2
