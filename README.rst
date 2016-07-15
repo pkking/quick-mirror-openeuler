@@ -59,6 +59,10 @@ following:
 
 * Anywhere you like, if you specify the path on the command line.
 
+You should ensure that the location you configure as ``DESTD`` exists.  the
+rest of the directory structure will be created there as necessary.
+
+
 Options
 -------
 
