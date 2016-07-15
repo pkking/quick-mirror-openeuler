@@ -229,7 +229,7 @@ if (( ? != 0 )); then
     db4 Could not acquire lock.
     # Maybe we haven't been able to mirror for some time....
     delay=$(( starttime - LASTTIME ))
-    if [[ -n $backdate ]]; then
+    if [[ -n $backdate || $LASTTIME -eq 0 ]]; then
         delay=0
     fi
 
