@@ -107,6 +107,9 @@ do_rsync () {
     return $rsyncreturn
 }
 
+# Main program execution
+# ======================
+
 # Parse args
 while [[ $# > 0 ]]; do
     opt=$1
@@ -208,6 +211,14 @@ if [[ -z $DESTD ]]; then
 fi
 if [[ -z $TIMEFILE ]]; then
     (>&2 echo "You must define TIMEFILE in your configuration file ($configfile).")
+fi
+
+# At this point we can acquire the lock
+lock $TIMEFILE
+
+if [[ $? -gt 0 ]]; then
+    db4 Could not acquire lock.
+    exit 1
 fi
 
 # Find the previous mirror time, and backdate if necessary
