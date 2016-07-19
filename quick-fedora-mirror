@@ -352,11 +352,9 @@ for module in $MODULES; do
         continue
     fi
 
-    # Extract checksums up front in order to use that as a syntax check on the file list.
-    awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
-
-    if [[ ! -s checksums-$module ]]; then
-        (>&2 echo "No checksums section.  Corrupted file list?"
+    tail -2 $fl | grep -q '^\[End\]$'
+    if (( ? != 0 )); then
+        (>&2 echo "No end marker.  Corrupted file list?"
         echo Skipping $module.)
         continue
     fi
@@ -470,11 +468,14 @@ for module in $MODULES; do
         sort allfilesizes-$module localfilesizes-$module | uniq -u | awk -F '\t' '{print $1}' | uniq -d > updatedfiles-$module
         cat updatedfiles-$module >> transferlist-$module
 
+        # Extract and verify checksums
+        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
         pushd $DESTD > /dev/null 2>&1
         sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null | grep -i 'failed$' | awk -F: '{print $1}' > $tempd/checksumfailed-$module
         popd > /dev/null 2>&1
         cat checksumfailed-$module >> transferlist-$module
 
+        # Do some counting and logging
         linecount=$(wc -l < localfiles-$module)
         linecount2=$(wc -l < localdirs-$module)
         db2f "Total on client:       %7d files, %4d dirs.\n" $linecount $linecount2
