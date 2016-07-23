@@ -70,7 +70,8 @@ TIMEFILE=
 # CHECKIN_PASSWORD=
 # CHECKIN_HOST=
 
-# Verbosity level
+# Verbosity levels - info sent to stdout; usually this gets mailed to root when
+# being run by cron
 # 0 - quiet
 # 1 - start and end times
 # 2 - no -q to rsync
@@ -82,6 +83,26 @@ TIMEFILE=
 # 8 - Shell script trace
 # VERBOSE=0
 
+# Define (to anything) to enable logging to the systemd journal (via
+# systemd-cat).  the identifier "quick-fedora-mirror" is used, so logs can be
+# retrieved with: journalctl -t quick-fedora-mirror
+# LOGJOURNAL=
+
+# Define to a full path to enable logging to that file.
+# The provided file must already exist and be writable.
+# Is only considered if LOGJOURNAL above is not defined.
+# LOGFILE=
+
+# Logging fields - Each character selects a piece of information to log.
+# c - rsync calls
+# C - rsync call completions
+# e - minor errors
+# E - serious errors
+# l - lock contentions
+# r - run start
+# R - run end (with statistics)
+# LOGITEMS=eElrR
+#
 # mktemp will be called after this file is sourced to make a temporary
 # directory.  This directory can contain a large amount of data, and that data
 # is specified by the server.  If your /tmp is small and you are concerned
