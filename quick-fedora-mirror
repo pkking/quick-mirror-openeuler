@@ -278,7 +278,7 @@ if (( VERBOSE <= 8 )); then
 fi
 
 # Set up a FIFO for logging.  Just calling systemd-cat repeatedly just gives us
-# a different PID # every time, which is annoying.
+# a different PID every time, which is annoying.
 if [[ -n $LOGJOURNAL ]]; then
     logfifo=$tempd/journal.fifo
     mkfifo $logfifo
