@@ -94,6 +94,7 @@ TIMEFILE=
 # LOGFILE=
 
 # Logging fields - Each character selects a piece of information to log.
+# a - aborted run recovery
 # c - rsync calls
 # C - rsync call completions
 # e - minor errors

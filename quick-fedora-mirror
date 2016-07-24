@@ -128,6 +128,11 @@ do_rsync () {
 
     # If we got here, we have a successful run.
     # XXX Grep the "interesting" information from the logs, according to verbosity.
+    #   ^Number of regular files transferred: ([0-9.]+)$
+    #   ^Total file size: ([,0-9]+)$
+    #   ^Total bytes received: ([,0-9]+)$
+    #   ^File list generation time: ([.0-9]+) seconds$
+    #
     #   2 - Only some of stdout (the summary line at the end of the transfer)
     #   5 - Now start showing more output.  What to show?
 
@@ -196,7 +201,7 @@ MODULEMAPPING=(
 
 # Default arguments; override in quick-fedora-mirror.conf
 VERBOSE=0
-LOGITEMS=eElrR
+LOGITEMS=aeElrR
 
 DESTD=
 TIMEFILE=
@@ -447,15 +452,20 @@ for module in $MODULES; do
         find $moduledir/* -printf '%y\t%p\t%s\n' > $tempd/localfulllist-$module
         popd
 
+        # Now extract file and dir lists from that
         awk -F '\t' '{if ($1 == "d") {print $2}}' < localfulllist-$module > localdirs-$module
+        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2}}' < localfulllist-$module > localfiles-$module
+        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2 "\t" $3}}' < localfulllist-$module > localfilesizes-$module
 
         # Look for stray .~tmp~ dirs
         if [[ -z $NORSYNCRECOVERY ]]; then
             grep '\.~tmp~' localdirs-$module > staletmpdirs-$module
+            grep '\.~tmp~' localfiles-$module > staletmpfiles-$module
         fi
 
         if [[ -s staletmpdirs-$module ]]; then
             db2 Possibly aborted rsync run.  Cleaning up.
+            logit a "cleaning up previous aborted run: $(wc -l staletmpfiles-$module) file(s)."
 
             # Move the files in those tmpdirs a level up if a file with the
             # same name doesn't exist.  We don't update the file lists because
@@ -476,10 +486,6 @@ for module in $MODULES; do
                 popd
             done
         fi
-
-        # Now extract file and dir lists from that
-        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2}}' < localfulllist-$module > localfiles-$module
-        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2 "\t" $3}}' < localfulllist-$module > localfilesizes-$module
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
