@@ -280,10 +280,10 @@ fi
 # Set up a FIFO for logging.  Just calling systemd-cat repeatedly just gives us
 # a different PID # every time, which is annoying.
 if [[ -n $LOGJOURNAL ]]; then
-	logfifo=$tempd/journal.fifo
-	mkfifo $logfifo
-	systemd-cat -t quick-fedora-mirror < $logfifo &
-	exec 3>$logfifo
+    logfifo=$tempd/journal.fifo
+    mkfifo $logfifo
+    systemd-cat -t quick-fedora-mirror < $logfifo &
+    exec 3>$logfifo
 fi
 
 outfile=$tempd/output
