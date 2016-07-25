@@ -103,7 +103,13 @@ TIMEFILE=
 # r - run start
 # R - run end (with statistics)
 # LOGITEMS=aeElrR
-#
+
+# When q-f-m fails to run becuse it is already running, it checks the time
+# since the last successful run.  If that is larger than this value, it logs a
+# serious error.  Thid helps to detect a hung run or issues with slow
+# transfers.
+# WARNDELAY=$((60 * 60 * 24)) # One day
+
 # mktemp will be called after this file is sourced to make a temporary
 # directory.  This directory can contain a large amount of data, and that data
 # is specified by the server.  If your /tmp is small and you are concerned
