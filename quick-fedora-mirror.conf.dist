@@ -102,7 +102,7 @@ TIMEFILE=
 # l - lock contentions
 # r - run start
 # R - run end (with statistics)
-# LOGITEMS=eElrR
+# LOGITEMS=aeElrR
 #
 # mktemp will be called after this file is sourced to make a temporary
 # directory.  This directory can contain a large amount of data, and that data
