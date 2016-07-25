@@ -297,7 +297,7 @@ touch $outfile
 cd $tempd
 
 db1 "Mirror starting: $(date)"
-logit r "Start run."
+logit r "Run start."
 
 if (( VERBOSE >= 6 )); then
     echo Times:
