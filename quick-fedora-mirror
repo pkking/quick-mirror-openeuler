@@ -213,7 +213,7 @@ FFILELIST='fullfilelist'
 MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/checkin
 REMOTE=rsync://dl.fedoraproject.org
 RSYNC=/usr/bin/rsync
-WARNDELAY=$(( 60 * 60 * 24 ))
+WARNDELAY=$((60 * 60 * 24))
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
@@ -260,6 +260,7 @@ fi
 lock $TIMEFILE
 if (( ? != 0 )); then
     db4 Could not acquire lock.
+    logit l lock contention
     # Maybe we haven't been able to mirror for some time....
     delay=$(( starttime - LASTTIME ))
     if [[ -n $backdate || $LASTTIME -eq 0 ]]; then
@@ -267,7 +268,8 @@ if (( ? != 0 )); then
     fi
 
     if (( delay > WARNDELAY )); then
-        (>&2 echo No completed run since $( date -d @$LASTTIME ).)
+        (>&2 echo No completed run since $(date -d @$LASTTIME ).)
+        logit E No completed run since $(date -d @$LASTTIME ).
     fi
     exit 1
 fi
