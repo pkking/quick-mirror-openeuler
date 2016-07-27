@@ -467,7 +467,7 @@ for module in $MODULES; do
 
         if [[ -s staletmpdirs-$module ]]; then
             db2 Possibly aborted rsync run.  Cleaning up.
-            logit a "cleaning up previous aborted run: $(wc -l staletmpfiles-$module) file(s)."
+            logit a "cleaning up previous aborted run: $(wc -l < staletmpfiles-$module) file(s)."
 
             # Move the files in those tmpdirs a level up if a file with the
             # same name doesn't exist.  We don't update the file lists because
