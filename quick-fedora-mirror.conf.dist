@@ -97,6 +97,7 @@ TIMEFILE=
 # a - aborted run recovery
 # c - rsync calls
 # C - rsync call completions
+# d - directory time updates
 # e - minor errors
 # E - serious errors
 # l - lock contentions
