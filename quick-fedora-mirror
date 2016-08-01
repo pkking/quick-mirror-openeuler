@@ -180,6 +180,9 @@ while [[ $# > 0 ]]; do
             alwayscheck=1
             shift
             ;;
+        --dir-times)
+            updatealldirtimes=1
+            ;;
         *)
             (>&2 echo "Unrecognized argument.")
             exit 1
@@ -498,9 +501,13 @@ for module in $MODULES; do
         cat deletedirs-$module >> master-deletedirs
 
         # Extract dirnames of every file and dir in the delete lists, and all of their parents.
-        awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
-            deletefiles-$module deletedirs-$module | sort -u > updatetimestamps-$module
-        cat updatetimestamps-$module >> master-updatetimestamps
+        if [[ -n $updatealldirtimes ]]; then
+            cat alldirs-$module >> master-updatetimestamps
+        else
+            awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
+                deletefiles-$module deletedirs-$module | sort -u > updatetimestamps-$module
+            cat updatetimestamps-$module >> master-updatetimestamps
+        fi
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
@@ -634,12 +641,13 @@ else
     db2 No stale files to delete.
 fi
 
-if [[ -n $deletedsomething && -n $KEEPDIRTIMES ]]; then
-    echo KEEPDIRTIMES not yet supported.
-    # XXX call rsync again with just the dirs which we might have changed by
-    # deleting, and all of their parents.
-    # Or call it with all dirs in the modules given a command line option.
-    # Implement dirname in awk.
+if [[ -s master-updatetimestamps ]]; then
+    extra=()
+    if [[ -n $rsyncdryrun ]]; then
+        extra+=(-n)
+    fi
+    logit d "Updating timestamps on $(wc -l < master-updatedirs) dirs"
+    do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-updatedirs extra
 fi
 
 # State saving
