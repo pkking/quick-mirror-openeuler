@@ -90,6 +90,10 @@ Options
     ``last week`` are useful examples.  Remember to quote if there are spaces.
     Implies ``-a``.
 
+--dir-times     Resynchronize the timestamps on all directories in the
+    repository.
+
+
 Initial Run
 -----------
 
