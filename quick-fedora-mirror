@@ -54,8 +54,6 @@ finish () {
     db1 "Mirror finished: $(date)"
     logit R "Run end."
     if [[ -s $outfile ]]; then
-        # Compose the output
-        # Depending on
         cat $outfile
     fi
     exit 0
@@ -75,14 +73,21 @@ do_rsync () {
     local errlog=rsync-error.log
 
     local -a verboseopts
+
+    # XXX Can we grep out motd after the fact?
+    # XXX Redo this.
+    # Basically, low verbosity never includes -q and always includes the list of changes and stats.
+    # All runs redirect to a file for later processing.  High verbosity levels
+    # tee to the log intead so that progress info goes to stdout as the run
+    # happens.  We could some magic with tail running in the background or
+    # something, but that's probably not fun.
+
     # These add to the default rsync verbosity
     (( VERBOSE >= 7 )) && verboseopts+=(--progress)
     (( VERBOSE >= 5 )) && verboseopts+=(-v)
     (( VERBOSE >= 4 )) && verboseopts+=(-v)
 
-    # These remove from the default rsync verbosity
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
-    (( VERBOSE == 0 )) && verboseopts+=(-q)
 
     flopts=(--files-from=$files)
 
@@ -95,22 +100,22 @@ do_rsync () {
 
         # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
         if (( VERBOSE >= 5 )); then
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
-            logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest"
+            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest"
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
             rsyncreturn=$?
         elif (( VERBOSE >= 2 )); then
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log
-            logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log
+            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log"
+            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log"
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
             rsyncreturn=$?
         else
-            db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
-            logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog
+            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog"
+            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog"
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
             rsyncreturn=$?
         fi
-        logit C call completed with return $rsyncreturn
+        logit C "call completed with return $rsyncreturn"
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
@@ -220,9 +225,9 @@ WARNDELAY=$((60 * 60 * 24))
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates --out-format='@ %i  %n%L')
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --fuzzy --delay-updates)
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --fuzzy --delay-updates --out-format='@ %i  %n%L')
 fi
 
 MASTERMODULE=fedora-buffet
@@ -259,24 +264,6 @@ if [[ -n $backdate ]]; then
     LASTTIME=$backdate
 fi
 
-# At this point we can acquire the lock
-lock $TIMEFILE
-if (( ? != 0 )); then
-    db4 Could not acquire lock.
-    logit l lock contention
-    # Maybe we haven't been able to mirror for some time....
-    delay=$(( starttime - LASTTIME ))
-    if [[ -n $backdate || $LASTTIME -eq 0 ]]; then
-        delay=0
-    fi
-
-    if (( delay > WARNDELAY )); then
-        (>&2 echo No completed run since $(date -d @$LASTTIME ).)
-        logit E No completed run since $(date -d @$LASTTIME ).
-    fi
-    exit 1
-fi
-
 # Make a temp dir and clean it up unless we're doing a lot of debugging
 tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
 if [[ $? -ne 0 ]]; then
@@ -300,6 +287,25 @@ outfile=$tempd/output
 touch $outfile
 
 cd $tempd
+
+
+# At this point we can acquire the lock
+lock $TIMEFILE
+if (( ? != 0 )); then
+    db4 Could not acquire lock.
+    logit l lock contention
+    # Maybe we haven't been able to mirror for some time....
+    delay=$(( starttime - LASTTIME ))
+    if [[ -n $backdate || $LASTTIME -eq 0 ]]; then
+        delay=0
+    fi
+
+    if (( delay > WARNDELAY )); then
+        (>&2 echo No completed run since $(date -d @$LASTTIME ).)
+        logit E No completed run since $(date -d @$LASTTIME ).
+    fi
+    exit 1
+fi
 
 db1 "Mirror starting: $(date)"
 logit r "Run start."
@@ -359,7 +365,7 @@ for module in $MODULES; do
     echo $moduledir/$flname >> filelist-transferlist
 done
 
-extra=(--no-dirs --relative)
+extra=(--no-dirs --relative --compress)
 do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
 
 # rsync won't transfer those files to the current directory, so move them and
