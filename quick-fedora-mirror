@@ -19,13 +19,25 @@ starttime=$(date +%s)
 # Paranoia; give us a few extra seconds.
 starttime=$(($starttime-5))
 
-# Debug output (goes to stderr/stdout, which may go to email)
-db1 () { (( VERBOSE >= 1 )) && echo $* >> $outfile}
-db2 () { (( VERBOSE >= 2 )) && echo $* >> $outfile}
-db3 () { (( VERBOSE >= 3 )) && echo '>>' $* >> $outfile}
-db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $* >> $outfile}
-sep () { (( VERBOSE >= 2 )) && echo '============================================================' >> $outfile}
-db2f () { (( VERBOSE >= 2 )) && printf $* >> $outfile}
+# Debug output;
+# Level 0: nothing except errors.
+# Level 1: lvl0 unless there is a tranfer, and then basic info and times.
+# Output goes to a file which may be spit out at the end of the run.
+# Level >= 2: Always some info, output to the terminal.
+db1 () {
+    if (( VERBOSE >= 2 )); then
+        echo $*
+    elif (( VERBOSE >= 1 )); then
+        echo $* >> $outfile
+    fi
+    # Otherwise output nothing....
+}
+
+db2 () { (( VERBOSE >= 2 )) && echo $*}
+db3 () { (( VERBOSE >= 3 )) && echo '>>' $*}
+db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $*}
+sep () { (( VERBOSE >= 2 )) && echo '============================================================'}
+db2f () { (( VERBOSE >= 2 )) && printf $*}
 
 # Log output
 logwrite () {
@@ -38,9 +50,13 @@ logwrite () {
 
 # Basic logging function
 logit () {
-    if [[ $LOGITEMS =~ $1 ]]; then
-       shift
+    local item=$1
+    shift
+    if [[ $LOGITEMS =~ $item ]]; then
        logwrite $*
+   fi
+   if (( VERBOSE >= 3 )); then
+       db3 Log: $*
    fi
 }
 
@@ -53,7 +69,7 @@ lock () {
 finish () {
     db1 "Mirror finished: $(date)"
     logit R "Run end."
-    if [[ -s $outfile ]]; then
+    if [[ -n $1 ]]; then
         cat $outfile
     fi
     exit 0
@@ -69,8 +85,11 @@ do_rsync () {
     local files=$3
     local opts=$4
     local sleep=1
-    local log=rsync.log
+    local log=$(mktemp -p .)
     local errlog=rsync-error.log
+    local rsyncreturn
+    local rvbash
+    local rvzsh
 
     local -a verboseopts
 
@@ -99,27 +118,22 @@ do_rsync () {
         # Or just use a freaking global.
 
         # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
+        db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+        logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
         if (( VERBOSE >= 5 )); then
-            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest"
-            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest"
-            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
-            rsyncreturn=$?
+            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest | tee $log
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
         elif (( VERBOSE >= 2 )); then
-            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log"
-            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log"
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
-            rsyncreturn=$?
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
         else
-            db3 "Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog"
-            logit c "calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest \>\> $log 2\>\> $errlog"
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
-            rsyncreturn=$?
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
         fi
-        logit C "call completed with return $rsyncreturn"
 
         (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
 
-        logit e "rsync returned $rsyncreturn"
+        logit e "rsync returned $rsyncreturn, sleeping for $sleep"
         db2 rsync failed: sleeping for $sleep
         sleep $sleep
         sleep=$(( sleep*2 ))
@@ -132,14 +146,27 @@ do_rsync () {
     done
 
     # If we got here, we have a successful run.
-    # XXX Grep the "interesting" information from the logs, according to verbosity.
-    #   ^Number of regular files transferred: ([0-9.]+)$
-    #   ^Total file size: ([,0-9]+)$
-    #   ^Total bytes received: ([,0-9]+)$
-    #   ^File list generation time: ([.0-9]+) seconds$
+    # Grep the "interesting" information from the logs, according to verbosity.
     #
+    # Number of regular files transferred: 1
+    rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print; exit}' $log | sed -e 's/Number of regular files transferred: //')
+
+    # Total file size: 10,174,746 bytes
+    rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print; exit}' $log | sed -e 's/Total file size: //' -e 's/ bytes//' -e 's/,//g')
+
+    # Total bytes received: 2,425,728
+    rstotalbytes=$(awk '/^Total bytes received: (.*)/ {print; exit}' $log | sed -e 's/Total bytes received: //' -e 's/,//g')
+
+    # File list generation time: 0.308 seconds
+    rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print; exit}' $log | sed -e 's/File list generation time: //' -e 's/ seconds//')
+
+    # File list transfer time: 0.000 seconds
+    rsfilelisttransfertime=$(awk '/^File list transfer time: (.*) seconds/ {print; exit}' $log | sed -e 's/File list transfer time: //' -e 's/ seconds//')
+
     #   2 - Only some of stdout (the summary line at the end of the transfer)
     #   5 - Now start showing more output.  What to show?
+
+    logit C rsync call completed succesfully with return $rsyncreturn
 
     return $rsyncreturn
 }
@@ -287,7 +314,6 @@ outfile=$tempd/output
 touch $outfile
 
 cd $tempd
-
 
 # At this point we can acquire the lock
 lock $TIMEFILE
@@ -499,8 +525,9 @@ for module in $MODULES; do
         fi
 
         # Find files on the client which don't exist on the server
-        sort allfiles-$module allfiles-$module localfiles-$module | uniq -u > deletefiles-$module
-        cat deletefiles-$module >> master-deletefiles
+        sort allfiles-$module allfiles-$module localfiles-$module \
+            | uniq -u \
+            | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
 
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
@@ -535,37 +562,37 @@ for module in $MODULES; do
         cat checksumfailed-$module >> transferlist-$module
 
         # Do some counting and logging
-        linecount=$(wc -l < localfiles-$module)
-        linecount2=$(wc -l < localdirs-$module)
-        db2f "Total on client:       %7d files, %4d dirs.\n" $linecount $linecount2
+        cntlocalfiles=$(wc -l < localfiles-$module)
+        cntlocaldirs=$(wc -l < localdirs-$module)
+        db2f "Total on client:       %7d files, %4d dirs.\n" $cntlocalfiles $cntlocaldirs
 
-        linecount=$(wc -l < deletefiles-$module)
-        linecount2=$(wc -l < deletedirs-$module)
-        db2f "Not present on server: %7d files, %4d dirs.\n" $linecount $linecount2
+        cntextrafiles=$(wc -l < deletefiles-$module)
+        cntextradirs=$(wc -l < deletedirs-$module)
+        db2f "Not present on server: %7d files, %4d dirs.\n" $cntextrafiles $cntextradirs
 
-        linecount=$(wc -l < missingfiles-$module)
-        linecount2=$(wc -l < missingdirs-$module)
-        totallines=$((totallines+linecount+linecount2))
-        db2f "Missing on client:     %7d files, %4d dirs.\n" $linecount $linecount2
+        cntmissingfiles=$(wc -l < missingfiles-$module)
+        cntmissingdirs=$(wc -l < missingdirs-$module)
+        totallines=$((totallines+cntmissingfiles+cntmissingdirs))
+        db2f "Missing on client:     %7d files, %4d dirs.\n" $cntmissingfiles $cntmissingdirs
 
-        linecount=$(wc -l < updatedfiles-$module)
-        totallines=$((totallines+linecount))
-        db2f "Size Changed:          %7d files.\n" $linecount
+        cntsizechanged=$(wc -l < updatedfiles-$module)
+        totallines=$((totallines+cntsizechanged))
+        db2f "Size Changed:          %7d files.\n" $cntsizechanged
 
-        linecount=$(wc -l < updatetimestamps-$module)
-        db2f "Timestamps to restore: %7d files.\n" $linecount
+        cntupdatetimestamps=$(wc -l < updatetimestamps-$module)
+        db2f "Timestamps to restore: %7d files.\n" $cntupdatetimestamps
 
-        linecount=$(wc -l < checksumfailed-$module)
-        totallines=$((totallines+linecount))
-        db2f "Checksum Failed:       %7d files.\n" $linecount
+        cntchecksumfailed=$(wc -l < checksumfailed-$module)
+        totallines=$((totallines+cntchecksumfailed))
+        db2f "Checksum Failed:       %7d files.\n" $cntchecksumfailed
     fi
 
     sort -u transferlist-$module >> transferlist-sorted-$module
     cat transferlist-sorted-$module >> master-transferlist
-    linecount=$(wc -l < transferlist-sorted-$module)
+    cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
 
     db2 Finished processing $module.
-    db2 After removing duplicates, $linecount files and dirs were added to the transfer list.
+    db2 After removing duplicates, $cnttotaltransfer files and dirs were added to the transfer list.
 
     # Clean up a bit.
     # XXX We need at least the dirlists for the checkin
@@ -576,7 +603,7 @@ done
 
 if [[ ! -e master-transferlist ]]; then
     db2 No changed files.
-    finish
+    finish no
 fi
 
 if [[ -n $MIRRORBUFFET ]]; then
@@ -602,16 +629,22 @@ do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted extra
 
 if [[ $? -ne 0 ]]; then
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
-    skipdelete=1
-    rsyncfail=1
+    logit E skipping further operations due to rsync failure
+    finish
 fi
+
+#echo "XXX Files transferred:    $rsfilestransferred"
+#echo "XXX File size:            $rsfilesize"
+#echo "XXX Total bytes received: $rstotalbytes"
+#echo "XXX File list gen time:   $rsfilelistgentime"
+#echo "XXX File list trans time: $rsfilelisttransfertime"
 
 # Local dir/file deletion
 # =======================
 if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
 
-    if [[ -n $skipdelete ]]; then
+    if [[ -n $skipdelete && $VERBOSE -ge 2 ]]; then
         echo Not deleting  $linecount directories.  Delete list is:
         cat master-deletedirs
         echo
@@ -647,13 +680,13 @@ else
     db2 No stale files to delete.
 fi
 
-if [[ -s master-updatetimestamps ]]; then
+if [[ -n $KEEPDIRTIMES && -s master-updatetimestamps ]]; then
     extra=()
     if [[ -n $rsyncdryrun ]]; then
         extra+=(-n)
     fi
-    logit d "Updating timestamps on $(wc -l < master-updatedirs) dirs"
-    do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-updatedirs extra
+    logit d "Updating timestamps on $(wc -l < master-updatetimestamps) dirs"
+    do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-updatetimestamps extra
 fi
 
 # State saving
