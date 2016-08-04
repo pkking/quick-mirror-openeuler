@@ -530,7 +530,8 @@ for module in $MODULES; do
             | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
 
         # Find dirs on the client which don't exist on the server
-        sort alldirs-$module alldirs-$module localdirs-$module | uniq -u > deletedirs-$module
+        sort alldirs-$module alldirs-$module localdirs-$module \
+            | uniq -u > deletedirs-$module
         cat deletedirs-$module >> master-deletedirs
 
         # Extract dirnames of every file and dir in the delete lists, and all of their parents.
@@ -538,52 +539,60 @@ for module in $MODULES; do
             cat alldirs-$module >> master-updatetimestamps
         else
             awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
-                deletefiles-$module deletedirs-$module | sort -u > updatetimestamps-$module
+                deletefiles-$module deletedirs-$module \
+                | sort -u > updatetimestamps-$module
             cat updatetimestamps-$module >> master-updatetimestamps
         fi
 
         # Find files on the server which are missing on the client
-        sort localfiles-$module localfiles-$module allfiles-$module | uniq -u > missingfiles-$module
+        sort localfiles-$module localfiles-$module allfiles-$module \
+            | uniq -u > missingfiles-$module
         cat missingfiles-$module >> transferlist-$module
 
         # Find dirs on the server which are missing on the client
-        sort localdirs-$module localdirs-$module alldirs-$module | uniq -u > missingdirs-$module
+        sort localdirs-$module localdirs-$module alldirs-$module \
+            | uniq -u > missingdirs-$module
         cat missingdirs-$module >> transferlist-$module
 
         # Find files which have changed size
-        sort allfilesizes-$module localfilesizes-$module | uniq -u | awk -F '\t' '{print $1}' | uniq -d > updatedfiles-$module
+        sort allfilesizes-$module localfilesizes-$module \
+            | uniq -u | awk -F '\t' '{print $1}' \
+            | uniq -d > updatedfiles-$module
         cat updatedfiles-$module >> transferlist-$module
 
         # Extract and verify checksums
         awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
         pushd $DESTD > /dev/null 2>&1
-        sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null | grep -i 'failed$' | awk -F: '{print $1}' > $tempd/checksumfailed-$module
+        sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null \
+            | grep -i 'failed$' \
+            | awk -F: '{print $1}' > $tempd/checksumfailed-$module
         popd > /dev/null 2>&1
         cat checksumfailed-$module >> transferlist-$module
 
-        # Do some counting and logging
+        # Count some things we want to use for stats later.
         cntlocalfiles=$(wc -l < localfiles-$module)
         cntlocaldirs=$(wc -l < localdirs-$module)
-        db2f "Total on client:       %7d files, %4d dirs.\n" $cntlocalfiles $cntlocaldirs
 
         cntextrafiles=$(wc -l < deletefiles-$module)
         cntextradirs=$(wc -l < deletedirs-$module)
-        db2f "Not present on server: %7d files, %4d dirs.\n" $cntextrafiles $cntextradirs
 
         cntmissingfiles=$(wc -l < missingfiles-$module)
         cntmissingdirs=$(wc -l < missingdirs-$module)
         totallines=$((totallines+cntmissingfiles+cntmissingdirs))
-        db2f "Missing on client:     %7d files, %4d dirs.\n" $cntmissingfiles $cntmissingdirs
 
         cntsizechanged=$(wc -l < updatedfiles-$module)
         totallines=$((totallines+cntsizechanged))
-        db2f "Size Changed:          %7d files.\n" $cntsizechanged
 
         cntupdatetimestamps=$(wc -l < updatetimestamps-$module)
-        db2f "Timestamps to restore: %7d files.\n" $cntupdatetimestamps
 
         cntchecksumfailed=$(wc -l < checksumfailed-$module)
         totallines=$((totallines+cntchecksumfailed))
+
+        db2f "Total on client:       %7d files, %4d dirs.\n" $cntlocalfiles $cntlocaldirs
+        db2f "Not present on server: %7d files, %4d dirs.\n" $cntextrafiles $cntextradirs
+        db2f "Missing on client:     %7d files, %4d dirs.\n" $cntmissingfiles $cntmissingdirs
+        db2f "Size Changed:          %7d files.\n" $cntsizechanged
+        db2f "Timestamps to restore: %7d files.\n" $cntupdatetimestamps
         db2f "Checksum Failed:       %7d files.\n" $cntchecksumfailed
     fi
 
@@ -630,7 +639,9 @@ do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted extra
 if [[ $? -ne 0 ]]; then
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
     logit E skipping further operations due to rsync failure
-    finish
+    skipdelete=1
+    skipcheckin=1
+    rsyncfail=1
 fi
 
 #echo "XXX Files transferred:    $rsfilestransferred"
@@ -673,7 +684,8 @@ if [[ -s master-deletefiles ]]; then
         db2 Removing $linecount stale files.
         xopts=()
         (( VERBOSE >= 4 )) && xopts=(-t)
-        tr '\n' '\0' < master-deletefiles | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
+        tr '\n' '\0' < master-deletefiles \
+            | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
         deletedsomething=1
     fi
 else
@@ -714,7 +726,7 @@ fi
 # This means (assuming that no excludes are being passed) that the
 # alldirs-$module file is accurate and we can simply report its contents to
 # mirrormanager.
-if [[ -z $CHECKIN_SITE ]]; then
+if [[ -z $CHECKIN_SITE || -n $skipcheckin ]]; then
     finish
 fi
 
