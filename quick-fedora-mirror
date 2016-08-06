@@ -66,6 +66,7 @@ lock () {
     return 1
 }
 
+# Finish up.  Dump the output file to stdout unless an arument is passed.
 finish () {
     db1 "Mirror finished: $(date)"
     logit R "Run end."
