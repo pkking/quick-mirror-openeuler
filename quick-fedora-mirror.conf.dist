@@ -105,11 +105,12 @@ TIMEFILE=
 # F - all transferred files (not impl)
 # g - file list generation start/end
 # k - lock contention
-# l - remote file list download start/end
-# L - local file list generation (recursive find) start/end
-# n - Lack of updates in a run
-# N - Lack of updates in a module
+# l - per-module local file list generation (recursive find) start/end
+# n - lack of updates in a run
+# N - lack of updates in a module
+# o - remote file list download start/end
 # p - module processing start/end
+# p - per-module module processing start/end
 # r - run start
 # R - run end
 # s - Basic transfer statistics (not impl)

@@ -373,7 +373,7 @@ fi
 # Master file list fetching
 # =========================
 sep
-logit l File list download: begin
+logit o Remote file list download: begin
 db2 Downloading file lists
 # ZSHISM (declare associative array)
 typeset -A fltimes
@@ -403,10 +403,11 @@ do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
 # clean up.
 mv */* .
 rmdir * 2> /dev/null
-logit l File list download: end
+logit o Remote file list download: end
 
 # File list generation
 # ====================
+logit p Processing start
 for module in $MODULES; do
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
@@ -425,7 +426,7 @@ for module in $MODULES; do
     fi
 
     sep
-    logit p Processing start: $module
+    logit P Processing start: $module
     db2 Processing $module
 
     if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
@@ -491,6 +492,7 @@ for module in $MODULES; do
 
     if [[ -d $DESTD/$moduledir ]]; then
         db3 Generating local file/dir list
+        logit l Generating file list begin: $module
 
         # Traverse the filesystem only once
         pushd $DESTD
@@ -531,6 +533,7 @@ for module in $MODULES; do
                 done
                 popd
             done
+        logit l Generating file list end: $module
         fi
 
         # Find files on the client which don't exist on the server
@@ -609,7 +612,7 @@ for module in $MODULES; do
     cat transferlist-sorted-$module >> master-transferlist
     cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
 
-    logit p Processing end: $module
+    logit P Processing end: $module
     db2 Finished processing $module.
     db2 After removing duplicates, $cnttotaltransfer files and dirs were added to the transfer list.
 
