@@ -681,7 +681,7 @@ if [[ -s master-deletedirs ]]; then
         db2 Removing $linecount stale directories.
         for nuke in $(cat master-deletedirs); do
             if [[ -d "$DESTD/$nuke" ]]; then
-                logit d Removing directory $nuke
+                logit D Deleting directory $nuke
                 db4 Removing $nuke
                 rm -rf "$DESTD/$nuke"
                 deletedsomething=1
@@ -704,10 +704,14 @@ if [[ -s master-deletefiles ]]; then
     else
         logit d File deletion begin: $linecount directories
         db2 Removing $linecount stale files.
-        xopts=()
-        (( VERBOSE >= 4 )) && xopts=(-t)
-        tr '\n' '\0' < master-deletefiles \
-            | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
+        # xopts=()
+        # (( VERBOSE >= 4 )) && xopts=(-t)
+        # tr '\n' '\0' < master-deletefiles \
+        #     | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
+        for nuke in $(cat master-deletefiles); do
+            logit D Deleting file $nuke
+            rm -f $nuke
+        done
         deletedsomething=1
         logit d File deletion end
     fi
