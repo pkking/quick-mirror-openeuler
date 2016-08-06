@@ -373,6 +373,7 @@ fi
 # Master file list fetching
 # =========================
 sep
+logit l File list download: begin
 db2 Downloading file lists
 # ZSHISM (declare associative array)
 typeset -A fltimes
@@ -402,6 +403,7 @@ do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
 # clean up.
 mv */* .
 rmdir * 2> /dev/null
+logit l File list download: end
 
 # File list generation
 # ====================
