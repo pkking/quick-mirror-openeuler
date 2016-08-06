@@ -95,6 +95,7 @@ TIMEFILE=
 
 # Logging fields - Each character selects a piece of information to log.
 # a - aborted run recovery
+# A - each recovered file from an aborted run
 # c - rsync calls
 # C - rsync call completions
 # d - directory time updates (not impl)

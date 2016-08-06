@@ -149,22 +149,26 @@ do_rsync () {
     # Grep the "interesting" information from the logs, according to verbosity.
     #
     # Number of regular files transferred: 1
-    rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print; exit}' $log | sed -e 's/Number of regular files transferred: //')
+    rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print $6; exit}' $log)
 
     # Total file size: 10,174,746 bytes
-    rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print; exit}' $log | sed -e 's/Total file size: //' -e 's/ bytes//' -e 's/,//g')
+    rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print $4; exit}' $log | sed -e 's/,//g')
 
     # Total bytes received: 2,425,728
-    rstotalbytes=$(awk '/^Total bytes received: (.*)/ {print; exit}' $log | sed -e 's/Total bytes received: //' -e 's/,//g')
+    rstotalbytes=$(awk '/^Total bytes received: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
 
     # File list generation time: 0.308 seconds
-    rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print; exit}' $log | sed -e 's/File list generation time: //' -e 's/ seconds//')
+    rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print $5; exit}' $log)
 
     # File list transfer time: 0.000 seconds
-    rsfilelisttransfertime=$(awk '/^File list transfer time: (.*) seconds/ {print; exit}' $log | sed -e 's/File list transfer time: //' -e 's/ seconds//')
+    rsfilelisttransfertime=$(awk '/^File list transfer time: (.*) seconds/ {print $5; exit}' $log)
 
-    #   2 - Only some of stdout (the summary line at the end of the transfer)
-    #   5 - Now start showing more output.  What to show?
+    # sent 71 bytes  received 2,425,728 bytes  156,503.16 bytes/sec
+    rstransferspeed=$(awk '/^sent .* bytes .* received .* bytes (.*) bytes/sec$/ {print $7; exit}' $log \
+                      | sed -e 's/,//g')
+
+    # total size is 10,174,746  speedup is 4.19
+    rsspeedup=$(awk '/^total size is .* speedup is (.*)$/ {print $7; exit}' $log)
 
     logit C rsync call completed succesfully with return $rsyncreturn
 
@@ -334,7 +338,7 @@ if (( ? != 0 )); then
 fi
 
 db1 "Mirror starting: $(date)"
-logit r "Run start."
+logit r "Run start: cfg=$configfile tmp=$tmpd"
 
 if (( VERBOSE >= 6 )); then
     echo Times:
@@ -516,6 +520,7 @@ for module in $MODULES; do
                 pushd $DESTD/$dir
                 for file in *; do
                     if [[ ! -f ../$file ]]; then
+                        logit A Saving previous download $file
                         db3 Saving previous download: $file
                         mv $file ..
                     fi
@@ -643,6 +648,8 @@ if [[ $? -ne 0 ]]; then
     skipcheckin=1
     rsyncfail=1
 fi
+
+# Files: $rsfilestransferred Size: $rsfilesize TransBytes: $rstotalbytes
 
 #echo "XXX Files transferred:    $rsfilestransferred"
 #echo "XXX File size:            $rsfilesize"
