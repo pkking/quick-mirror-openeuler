@@ -417,6 +417,7 @@ for module in $MODULES; do
     # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
     if [[ -z $alwayscheck && -f $fl.old && $(stat --format=%Y $fl.old) == $(stat --format=%Y $fl) ]]; then
+        logit N No change in file list time for $module
         db2 No change in file list mtime.  Skipping $module.
         continue
     fi

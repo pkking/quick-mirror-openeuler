@@ -105,7 +105,7 @@ TIMEFILE=
 # F - all transferred files (not impl)
 # l - lock contention
 # n - Lack of updates in a run (not impl)
-# N - Lack of updates in a module (not impl)
+# N - Lack of updates in a module
 # p - module processing start/end (not impl)
 # r - run start
 # R - run end
