@@ -323,7 +323,7 @@ cd $tempd
 lock $TIMEFILE
 if (( ? != 0 )); then
     db4 Could not acquire lock.
-    logit l lock contention
+    logit k lock contention
     # Maybe we haven't been able to mirror for some time....
     delay=$(( starttime - LASTTIME ))
     if [[ -n $backdate || $LASTTIME -eq 0 ]]; then
@@ -338,7 +338,7 @@ if (( ? != 0 )); then
 fi
 
 db1 "Mirror starting: $(date)"
-logit r "Run start: cfg=$configfile tmp=$tmpd"
+logit r Run start: cfg $configfile, tmp $tmpd
 
 if (( VERBOSE >= 6 )); then
     echo Times:
@@ -423,6 +423,7 @@ for module in $MODULES; do
     fi
 
     sep
+    logit p Processing start: $module
     db2 Processing $module
 
     if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
@@ -606,6 +607,7 @@ for module in $MODULES; do
     cat transferlist-sorted-$module >> master-transferlist
     cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
 
+    logit p Processing end: $module
     db2 Finished processing $module.
     db2 After removing duplicates, $cnttotaltransfer files and dirs were added to the transfer list.
 
@@ -617,6 +619,7 @@ for module in $MODULES; do
 done
 
 if [[ ! -e master-transferlist ]]; then
+    logit n No changes to synchronize
     db2 No changed files.
     finish no
 fi

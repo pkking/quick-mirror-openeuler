@@ -103,10 +103,13 @@ TIMEFILE=
 # e - minor errors
 # E - serious errors
 # F - all transferred files (not impl)
-# l - lock contention
-# n - Lack of updates in a run (not impl)
+# g - file list generation start/end
+# k - lock contention
+# l - remote file list download start/end
+# L - local file list generation (recursive find) start/end
+# n - Lack of updates in a run
 # N - Lack of updates in a module
-# p - module processing start/end (not impl)
+# p - module processing start/end
 # r - run start
 # R - run end
 # s - Basic transfer statistics (not impl)
