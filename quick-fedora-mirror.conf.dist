@@ -98,8 +98,8 @@ TIMEFILE=
 # A - each recovered file from an aborted run
 # c - rsync calls
 # C - rsync call completions
-# d - directory time updates (not impl)
-# D - all file deletes (not impl)
+# d - File/directory deletion start/end
+# D - all file/directory deletes
 # e - minor errors
 # E - serious errors
 # F - all transferred files (not impl)
@@ -115,6 +115,7 @@ TIMEFILE=
 # R - run end
 # s - Basic transfer statistics (not impl)
 # S - Detailed transfer statistics (not impl)
+# t - directory time updates (not impl)
 # LOGITEMS=aeElrRs
 
 # When q-f-m fails to run becuse it is already running, it checks the time

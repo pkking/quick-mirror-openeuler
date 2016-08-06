@@ -373,7 +373,7 @@ fi
 # Master file list fetching
 # =========================
 sep
-logit o Remote file list download: begin
+logit o Remote file list download start
 db2 Downloading file lists
 # ZSHISM (declare associative array)
 typeset -A fltimes
@@ -492,7 +492,7 @@ for module in $MODULES; do
 
     if [[ -d $DESTD/$moduledir ]]; then
         db3 Generating local file/dir list
-        logit l Generating file list begin: $module
+        logit l Generating file list start: $module
 
         # Traverse the filesystem only once
         pushd $DESTD
@@ -672,18 +672,22 @@ if [[ -s master-deletedirs ]]; then
     linecount=$(wc -l < master-deletedirs)
 
     if [[ -n $skipdelete && $VERBOSE -ge 2 ]]; then
+        logit d Directory deletion skipped
         echo Not deleting  $linecount directories.  Delete list is:
         cat master-deletedirs
         echo
     else
+        logit d Directory deletion start: $linecount directories
         db2 Removing $linecount stale directories.
         for nuke in $(cat master-deletedirs); do
             if [[ -d "$DESTD/$nuke" ]]; then
+                logit d Removing directory $nuke
                 db4 Removing $nuke
                 rm -rf "$DESTD/$nuke"
                 deletedsomething=1
             fi
         done
+        logit d Directory deletion end
     fi
 else
     db2 No stale directories to delete.
@@ -693,16 +697,19 @@ if [[ -s master-deletefiles ]]; then
     linecount=$(wc -l < master-deletefiles)
 
     if [[ -n $skipdelete ]]; then
+        logit d File deletion skipped
         echo Not deleting $linecount stale files.  Delete list is:
         cat master-deletefiles
         echo
     else
+        logit d File deletion begin: $linecount directories
         db2 Removing $linecount stale files.
         xopts=()
         (( VERBOSE >= 4 )) && xopts=(-t)
         tr '\n' '\0' < master-deletefiles \
             | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
         deletedsomething=1
+        logit d File deletion end
     fi
 else
     db2 No stale files to delete.
