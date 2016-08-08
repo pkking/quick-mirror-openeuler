@@ -66,7 +66,7 @@ lock () {
     return 1
 }
 
-# Finish up.  Dump the output file to stdout unless an arument is passed.
+# Finish up.  Dump the output file to stdout unless an argument is passed.
 finish () {
     db1 "Mirror finished: $(date)"
     logit R "Run end."
@@ -81,32 +81,20 @@ do_rsync () {
     # The name of an array containing additional options.
     # If rsync fails, this will sleep with exponential backoff ten times, and
     # then will exit the script (not just the function).
-    local src=$1
-    local dest=$2
-    local files=$3
-    local opts=$4
+    local src=$1 dest=$2 files=$3 opts=$4
     local sleep=1
     local log=$(mktemp -p .)
     local errlog=rsync-error.log
-    local rsyncreturn
-    local rvbash
-    local rvzsh
+    local rr rvbash rvzsh
 
     local -a verboseopts
-
-    # XXX Can we grep out motd after the fact?
-    # XXX Redo this.
-    # Basically, low verbosity never includes -q and always includes the list of changes and stats.
-    # All runs redirect to a file for later processing.  High verbosity levels
-    # tee to the log intead so that progress info goes to stdout as the run
-    # happens.  We could some magic with tail running in the background or
-    # something, but that's probably not fun.
 
     # These add to the default rsync verbosity
     (( VERBOSE >= 7 )) && verboseopts+=(--progress)
     (( VERBOSE >= 5 )) && verboseopts+=(-v)
     (( VERBOSE >= 4 )) && verboseopts+=(-v)
 
+    # Usually we won't want to see this.
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
 
     flopts=(--files-from=$files)
@@ -123,32 +111,42 @@ do_rsync () {
         logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
         if (( VERBOSE >= 5 )); then
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest | tee $log
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         elif (( VERBOSE >= 2 )); then
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         else
             $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rsyncreturn=$rvbash$rvzsh
+            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         fi
 
-        (( rsyncreturn != 5 && rsyncreturn != 10 )) && break
-
-        logit e "rsync returned $rsyncreturn, sleeping for $sleep"
-        db2 rsync failed: sleeping for $sleep
-        sleep $sleep
-        sleep=$(( sleep*2 ))
-        if (( sleep > 1000 )); then
-            logit E rsync from $REMOTE/$module failed
-            (>&2 echo "Could not sync from $REMOTE/$module")
-            [[ -f $errlog ]] && (>&2 cat $errlog)
-            exit 1
+        # We should ignore; 0 (obviously) 24
+        # If we retried on 24 (missing files on server) we'd never make progress.
+        # We should retry: 5 10 23 30 35
+        if (( rr == 0 )); then
+            break
+        elif (( rr == 24 )); then
+            break
+        elif (( rr == 5 || rr == 10 || rr == 23 || rr == 30 || rr == 35 )); then
+            logit e "rsync returned $rr (retryable), sleeping for $sleep"
+            db2 rsync failed: sleeping for $sleep
+            sleep $sleep
+            sleep=$(( sleep*2 ))
+            if (( sleep > 1000 )); then
+                logit E rsync from $REMOTE/$module failed
+                (>&2 echo "Could not sync from $REMOTE/$module")
+                [[ -f $errlog ]] && (>&2 cat $errlog)
+                exit 1
+            fi
+        else
+            # Some other code we didn't anticipate
+            logit E rsync returned $rr.  This is not recoverable.
+            (>&2 echo rsync returned $rr; this is not recoverable.
+                [[ -f $errlog ]] && cat $errlog
+            )
         fi
     done
 
-    # If we got here, we have a successful run.
-    # Grep the "interesting" information from the logs, according to verbosity.
-    #
     # Number of regular files transferred: 1
     rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print $6; exit}' $log)
 
@@ -171,9 +169,9 @@ do_rsync () {
     # total size is 10,174,746  speedup is 4.19
     rsspeedup=$(awk '/^total size is .* speedup is (.*)$/ {print $7; exit}' $log)
 
-    logit C rsync call completed succesfully with return $rsyncreturn
+    logit C rsync call completed succesfully with return $rr
 
-    return $rsyncreturn
+    return $rr
 }
 
 # Main program execution
