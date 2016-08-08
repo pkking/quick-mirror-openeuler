@@ -270,6 +270,7 @@ for file in $cfgfile /etc/quick-fedora-mirror.conf \
         ./quick-fedora-mirror.conf; do
     if [[ -r $file ]]; then
         source $file
+        cfgfile=$file
         break
     fi
 done
@@ -337,7 +338,7 @@ if (( ? != 0 )); then
 fi
 
 db1 "Mirror starting: $(date)"
-logit r Run start: cfg $cfgfile, tmp $tmpd
+logit r Run start: cfg $cfgfile, tmp $tempd
 
 if (( VERBOSE >= 6 )); then
     echo Times:
