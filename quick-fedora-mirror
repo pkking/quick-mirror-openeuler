@@ -279,10 +279,10 @@ done
 
 # Check that the required parameters were provided
 if [[ -z $DESTD ]]; then
-    (>&2 echo "You must define DESTD in your configuration file ($configfile).")
+    (>&2 echo "You must define DESTD in your configuration file ($cfgfile).")
 fi
 if [[ -z $TIMEFILE ]]; then
-    (>&2 echo "You must define TIMEFILE in your configuration file ($configfile).")
+    (>&2 echo "You must define TIMEFILE in your configuration file ($cfgfile).")
 fi
 
 # Find the previous mirror time, and backdate if necessary
@@ -337,7 +337,7 @@ if (( ? != 0 )); then
 fi
 
 db1 "Mirror starting: $(date)"
-logit r Run start: cfg $configfile, tmp $tmpd
+logit r Run start: cfg $cfgfile, tmp $tmpd
 
 if (( VERBOSE >= 6 )); then
     echo Times:
