@@ -429,10 +429,11 @@ for module in $MODULES; do
     logit P Processing start: $module
     db2 Processing $module
 
-    if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
-        echo "Changes in file list since last run:"
-        diff -u $fl.old $fl
-    fi
+    # Diffing the whole thing is not really useful
+    #if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
+    #    echo "Changes in file list since last run:"
+    #    diff -u $fl.old $fl
+    #fi
 
     flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
     if [[ "$flversion" != '2' ]]; then
