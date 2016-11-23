@@ -296,7 +296,12 @@ if [[ -n $backdate ]]; then
 fi
 
 # Make a temp dir and clean it up unless we're doing a lot of debugging
-tempd=$(mktemp -d -p $TMPDIR -t quick-mirror.XXXXXXXXXX)
+if [[ -z $TMPDIR ]]; then
+    tempd=$(mktemp -d -t quick-mirror.XXXXXXXXXX)
+else
+    tempd=$(mktemp -d -p $TMPDIR -t quick-mirror.XXXXXXXXXX)
+fi
+
 if [[ $? -ne 0 ]]; then
     (>&2 echo "Creating temporary directory failed?")
     exit 1

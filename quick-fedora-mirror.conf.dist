@@ -46,7 +46,9 @@ TIMEFILE=
 # You can add excludes here, but the script will always detect those files as
 # missing and will add them back to the file list.  This may generate
 # complaints from rsync, but should not cause any problems.
-# RSYNCOPTS=RSYNCOPTS=(-aSH -f 'R .~tmp~' --preallocate --fuzzy --delay-updates)
+# Note that some of these options may be required for proper operation of the
+# script.
+# RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates --out-format='@ %i  %n%L')¬
 
 # By default quick-fedora-mirror will try to detect and recover from an aborted
 # rsync run by moving any already downloaded files into place before
