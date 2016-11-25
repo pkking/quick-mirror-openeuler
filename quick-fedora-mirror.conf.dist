@@ -133,3 +133,14 @@ TIMEFILE=
 # about the server potentially sending extra-huge files and filling things up,
 # you can set TMPDIR here.
 # TMPDIR=
+
+# A regular expression used to filter the file lists. It must be quoted (or
+# very carefully escaped). Entries matching this expression will not be synced
+# and are expected not to be present locally. They will also be ignored by
+# quick-fedora-hardlink. Cannot contain commas. Run against the file list that
+# includes sizes (by quick-fedora-mirror) and the fullfiletimelist (by
+# quick-fedora-hardlink), so don't use expressions that would match those
+# metadata (which are digit strings and single characters). Example is a heavy
+# filter which gives you an x86_64-only mirror with source packages, debuginfo
+# packages, Alpha and Beta releases, and most image files excluded.
+# FILTEREXP='(/i386|/armhfp|/source|/SRPMS|/debug/|\.iso|\.img|\.qcow2|\.raw\.xz|\.box|/releases/test)'
