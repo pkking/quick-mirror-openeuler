@@ -546,6 +546,7 @@ for module in $MODULES; do
         sort allfiles-$module allfiles-$module localfiles-$module \
             | uniq -u \
             | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
+        cat deletefiles-$module >> master-deletefiles
 
         # Find dirs on the client which don't exist on the server
         sort alldirs-$module alldirs-$module localdirs-$module \
