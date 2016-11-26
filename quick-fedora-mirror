@@ -76,6 +76,13 @@ finish () {
     exit 0
 }
 
+# Client-side file list filtering.
+filter () {
+    if [[ -n $FILTEREXP ]]; then
+        sed -i -r -e "\,$FILTEREXP,d" $1
+    fi
+}
+
 do_rsync () {
     # Options: source, destination.
     # The name of an array containing additional options.
@@ -462,6 +469,11 @@ for module in $MODULES; do
                  {if (s && \$2 == \"f\" || \$2 == \"l\")
                         print \"$moduledir/\" \$4 \"\t\" \$3}
                 " $fl > allfilesizes-$module
+
+    # Filter the list if requested.
+    filter allfilesizes-$module
+
+    # Produce the file list.
     awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module
 
     # All dirs in the remote repository.
@@ -469,6 +481,9 @@ for module in $MODULES; do
                  { if (s && \$2 == \"d\")
                         print \"$moduledir/\" \$4}
                 " < $fl > alldirs-$module
+
+    # Filter the list if requested.
+    filter alldirs-$module
 
     linecount=$(wc -l < allfiles-$module)
     linecount2=$(wc -l < alldirs-$module)
@@ -480,11 +495,17 @@ for module in $MODULES; do
                         print \"$moduledir/\" \$4}
                 " < $fl > newfiles-$module
 
+    # Filter the list if requested.
+    filter newfiles-$module
+
     # Dirs on the server which changed since the last run
     awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
                  { if (s && \$1 >= $LASTTIME &&(\$2 == \"d\"))
                         print \"$moduledir/\" \$4}
                 " < $fl > newdirs-$module
+
+    # Filter the list if requested.
+    filter newdirs-$module
 
     linecount=$(wc -l < newfiles-$module)
     linecount2=$(wc -l < newdirs-$module)
@@ -639,7 +660,6 @@ fi
 if [[ -n $MIRRORBUFFET ]]; then
     echo DIRECTORY_SIZES.txt >> master-transferlist
 fi
-
 
 # The actual transfer
 # ===================

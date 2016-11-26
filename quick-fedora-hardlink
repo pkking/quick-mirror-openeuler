@@ -89,8 +89,8 @@ def uprint(string):
 def config_read(opts):
     """Read the configuration file.
 
-    We really only want DESTD and FILELIST
-    The value is stored in the existing options array.
+    We really only want DESTD, FILELIST and FILTEREXP
+    The values are stored in the existing options array.
     """
     with open(opts.config) as cf:
         for line in cf:
@@ -101,6 +101,12 @@ def config_read(opts):
             m = re.search('^\s*FILELIST=(\S+)', line)
             if m:
                 opts.filelist = m.group(1)
+
+            m = re.search('^\s*FILTEREXP=(\S+)', line)
+            if m:
+                opts.filterexp = re.compile(m.group(1).strip('\'"'))
+            else:
+                opts.filterexp = None
 
 
 def config_check(opts):
@@ -124,7 +130,7 @@ def skip_to_files(f):
     return False
 
 
-def process_one_filelist(filelist, module, candidates, check_ctime=True):
+def process_one_filelist(filelist, module, candidates, check_ctime=True, filterexp=None):
     with open(filelist) as f:
         skip_to_files(f)
 
@@ -134,6 +140,8 @@ def process_one_filelist(filelist, module, candidates, check_ctime=True):
                 break
             fields = line.split('\t')
             if fields[1] != 'f':
+                continue
+            if filterexp and filterexp.search(line):
                 continue
 
             ctime = fields[0]
@@ -160,7 +168,7 @@ def trim_candidates(candidates):
         del candidates[k]
 
 
-def generate_candidates(filelist='fullfiletimelist-$mdir', check_ctime=True):
+def generate_candidates(filelist='fullfiletimelist-$mdir', check_ctime=True, filterexp=None):
     """Process filelists in the current directory.
 
     Looks for all filelists in the current directory and processes them all.
@@ -176,7 +184,7 @@ def generate_candidates(filelist='fullfiletimelist-$mdir', check_ctime=True):
             continue
 
         print('  {}'.format(fl))
-        process_one_filelist(fl, module, candidates, check_ctime=check_ctime)
+        process_one_filelist(fl, module, candidates, check_ctime=check_ctime, filterexp=filterexp)
 
     return candidates
 
@@ -341,7 +349,7 @@ def main():
     os.chdir(opts.destd)
     timestart = time.time()
     print('Processing file lists in {}:'.format(opts.destd))
-    c = generate_candidates(filelist=opts.filelist, check_ctime=opts.check_ctime)
+    c = generate_candidates(filelist=opts.filelist, check_ctime=opts.check_ctime, filterexp=opts.filterexp)
     trim_candidates(c)
     print()
     print('Found {} tuples of potentially hardlinkable files in {:.1f} minutes.'

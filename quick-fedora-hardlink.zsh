@@ -135,6 +135,11 @@ for mdir in *; do
             }
         ' $flname > $tmpname
 
+    # filter the list, if necessary
+    if [[ -n $FILTEREXP ]]; then
+        sed -i -r -e "\,$FILTEREXP,d" $tmpname
+    fi
+
         filelists+=($tmpname)
         linecount=$(wc -l < $tmpname)
         totallines=$((totallines + linecount))
