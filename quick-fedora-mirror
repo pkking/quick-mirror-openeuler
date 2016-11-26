@@ -785,7 +785,11 @@ if [[ -z $CHECKIN_SITE || -n $skipcheckin ]]; then
 fi
 
 db2 Performing mirrormanager checkin
+# XXX Log
 mm=mirrormanager-payload
+mx=mirrormanager-xmlrpc
+
+# First construct the checkin payload
 
 # The json produced by report_mirror will start with a bracket, followed by
 # info for each module, followed by some data relating to the host and site
@@ -839,9 +843,44 @@ cat >>$mm <<EOF
 }
 EOF
 
-# XXX gzip the payload and change the content type to application/gzip
+echo
+echo "Checkin payload"
+cat $mm
+
+# The xmlrpc endpoint requires that the payload be bzip2 compressed
+bzip2 $mm
+
+# base64 encode
+base64 $mm.bz2 > $mm.bz2.b64
+
+# change '+' to '-'  and '/' to '_'
+tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
+
+# Wrap the transformed, base64 encoded bzip2 compressed json payload in just
+# the right xml
+# XXX I hope that newlines are allowed inside the <string> block.
+cat >>$mx <<EOF
+<?xml version='1.0'?>
+<methodCall>
+<methodNme>checkin</methodName>
+<params>
+<param>
+<value><string>
+EOF
+cat <$mm.bz2.b64.tr >>$mx
+
+cat >>$mx <<EOF
+</sring></value>
+</param>
+</params>
+</methodCall>
+EOF
+
+echo
+echo "All checkin data"
+cat $mx
 
 # Now actually upload the payload
-#$CURL -H "Content-Type: application/json" --data @$mm $MIRRORMANAGER
+$CURL -H "Content-Type: text/xml" --verbose --data @$mx $MIRRORMANAGER/xmlrpc
 
 finish
