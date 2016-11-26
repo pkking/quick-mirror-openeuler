@@ -737,7 +737,7 @@ if [[ -s master-deletefiles ]]; then
         #     | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
         for nuke in $(cat master-deletefiles); do
             logit D Deleting file $nuke
-            rm -f $nuke
+            rm -f "$DESTD/$nuke"
         done
         deletedsomething=1
         logit d File deletion end
