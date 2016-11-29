@@ -720,7 +720,7 @@ if [[ -s master-deletefiles ]]; then
         cat master-deletefiles
         echo
     else
-        logit d File deletion begin: $linecount directories
+        logit d File deletion begin: $linecount files
         db2 Removing $linecount stale files.
         # xopts=()
         # (( VERBOSE >= 4 )) && xopts=(-t)
