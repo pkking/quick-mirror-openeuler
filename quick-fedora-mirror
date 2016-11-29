@@ -721,12 +721,12 @@ if [[ -s master-deletefiles ]]; then
         db2 Removing $linecount stale files.
         # xopts=()
         # (( VERBOSE >= 4 )) && xopts=(-t)
-        # tr '\n' '\0' < master-deletefiles \
-        #     | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
-        for nuke in $(cat master-deletefiles); do
-            logit D Deleting file $nuke
-            rm -f "$DESTD/$nuke"
-        done
+        tr '\n' '\0' < master-deletefiles \
+            | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
+        # for nuke in $(cat master-deletefiles); do
+        #     logit D Deleting file $nuke
+        #     rm -f "$DESTD/$nuke"
+        # done
         deletedsomething=1
         logit d File deletion end
     fi
