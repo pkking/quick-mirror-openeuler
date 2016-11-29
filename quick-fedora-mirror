@@ -90,8 +90,8 @@ do_rsync () {
     # then will exit the script (not just the function).
     local src=$1 dest=$2 files=$3 opts=$4
     local sleep=1
-    local log=$(mktemp -p .)
-    local errlog=rsync-error.log
+    local log=$(mktemp -p . rsync-out-XXXXXX.log)
+    local errlog=$(mktemp -p . rsync-err-XXXXXX.log)
     local rr rvbash rvzsh
 
     local -a verboseopts
