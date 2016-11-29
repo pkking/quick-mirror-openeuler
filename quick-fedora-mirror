@@ -426,7 +426,9 @@ for module in $MODULES; do
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
-    if [[ -n $checksums[$module] ]] && [[ $(sha1sum $fl | cut -d' ' -f1) == $checksums[$module] ]]; then
+    if [[ -z $alwayscheck && \
+            -n $checksums[$module] && \
+            $(sha1sum $fl | cut -d' ' -f1) == $checksums[$module] ]]; then
         logit N No change in file list for $module
         db2 No change in file list checksum.  Skipping $module.
         continue
