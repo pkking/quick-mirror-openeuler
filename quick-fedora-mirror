@@ -262,9 +262,9 @@ WARNDELAY=$((60 * 60 * 24))
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates --out-format='@ %i  %n%L')
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --fuzzy --delay-updates --out-format='@ %i  %n%L')
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
 fi
 
 MASTERMODULE=fedora-buffet

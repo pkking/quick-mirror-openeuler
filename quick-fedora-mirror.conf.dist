@@ -48,7 +48,7 @@ TIMEFILE=
 # complaints from rsync, but should not cause any problems.
 # Note that some of these options may be required for proper operation of the
 # script.
-# RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates --out-format='@ %i  %n%L')
+# RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
 
 # By default quick-fedora-mirror will try to detect and recover from an aborted
 # rsync run by moving any already downloaded files into place before
