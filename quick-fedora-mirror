@@ -395,6 +395,7 @@ for module in $MODULES; do
     mkdir $moduledir
     flname=${FILELIST/'$mdir'/$moduledir}
     if [[ -f $DESTD/$moduledir/$flname ]]; then
+        cp -p $DESTD/$moduledir/$flname $moduledir
         # ZSHISM (assign assoc. array value)
         checksums[$module]=$(sha1sum $DESTD/$moduledir/$flname | cut -d' ' -f1)
     fi
