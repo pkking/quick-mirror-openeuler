@@ -262,9 +262,9 @@ WARNDELAY=$((60 * 60 * 24))
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --fuzzy --delay-updates --out-format='@ %i  %n%L')
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
 else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --fuzzy --delay-updates --out-format='@ %i  %n%L')
+    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
 fi
 
 MASTERMODULE=fedora-buffet
@@ -388,21 +388,15 @@ sep
 logit o Remote file list download start
 db2 Downloading file lists
 # ZSHISM (declare associative array)
-typeset -A fltimes
+typeset -A checksums
 for module in $MODULES; do
     # ZSHISM? (associative array indexing)
     moduledir=$MODULEMAPPING[$module]
     mkdir $moduledir
     flname=${FILELIST/'$mdir'/$moduledir}
-
-    # ZSHISM (assign assoc. array value)
-    fltimes[$module]=0
     if [[ -f $DESTD/$moduledir/$flname ]]; then
-        cp -p $DESTD/$moduledir/$flname $moduledir
-        # So that we can diff it later
-        cp -p $moduledir/$flname $flname.old
         # ZSHISM (assign assoc. array value)
-        fltimes[$module]=$(stat --format=%Y $moduledir/$flname)
+        checksums[$module]=$(sha1sum $DESTD/$moduledir/$flname | cut -d' ' -f1)
     fi
 
     echo $moduledir/$flname >> filelist-transferlist
@@ -431,21 +425,15 @@ for module in $MODULES; do
     # First fetch each filefiletimelist, and make one big transfer list from
     # all of them.  Copy in the old file from our repo to speed up rsync in case
     # most of it didn't change
-    if [[ -z $alwayscheck && -f $fl.old && $(stat --format=%Y $fl.old) == $(stat --format=%Y $fl) ]]; then
-        logit N No change in file list time for $module
-        db2 No change in file list mtime.  Skipping $module.
+    if [[ -n $checksums[$module] ]] && [[ $(sha1sum $fl | cut -d' ' -f1) == $checksums[$module] ]]; then
+        logit N No change in file list for $module
+        db2 No change in file list checksum.  Skipping $module.
         continue
     fi
 
     sep
     logit P Processing start: $module
     db2 Processing $module
-
-    # Diffing the whole thing is not really useful
-    #if [[ $VERBOSE -ge 6 && -f $fl.old ]]; then
-    #    echo "Changes in file list since last run:"
-    #    diff -u $fl.old $fl
-    #fi
 
     flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
     if [[ "$flversion" != '2' ]]; then
@@ -737,7 +725,7 @@ if [[ -s master-deletefiles ]]; then
         #     | (pushd $DESTD; xargs $xopts -0 rm -f ; popd)
         for nuke in $(cat master-deletefiles); do
             logit D Deleting file $nuke
-            rm -f $nuke
+            rm -f "$DESTD/$nuke"
         done
         deletedsomething=1
         logit d File deletion end
