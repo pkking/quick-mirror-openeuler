@@ -166,7 +166,7 @@ lists not used by the client:
 
 * A simple list of files, one per line, as Fedora also maintains such a file.
 * A file specifically listing specific types of image files, which is useful for other
-Fedora tools not related to mirroring.
+  Fedora tools not related to mirroring.
 
 The main file list contains a timestamp and size for each file.  The timestamp
 in the file list is the newer of mtime and ctime.  This means that newly
