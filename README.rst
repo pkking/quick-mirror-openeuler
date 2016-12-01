@@ -42,9 +42,9 @@ six seconds.
 The client preserves file timestamps, but does not preserve directory
 timestamps in all situations.
 
-After a successful mirror run, a mirrormanager checkin can optionaly be done.
-This eliminates the need to run report_mirror, and also avoids another full
-filesystem traversal.
+After a successful mirror run, the client can optionally perform a
+mirrormanager checkin.  This eliminates the need to run report_mirror, and also
+avoids another full filesystem traversal.
 
 Installation
 ------------
