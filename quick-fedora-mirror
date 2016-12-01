@@ -236,12 +236,21 @@ done
 # Mapping from module names to directories under fedora-buffet
 # ZSHISM (initialize associative array)
 typeset -A MODULEMAPPING
+typeset -A MIRRORMANAGERMAPPING
 MODULEMAPPING=(
     fedora-alt          alt
     fedora-archive      archive
     fedora-enchilada    fedora
     fedora-epel         epel
     fedora-secondary    fedora-secondary
+    )
+
+MIRRORMANAGERMAPPING=(
+    fedora-alt          'fedora other'
+    fedora-archive      'fedora archive'
+    fedora-enchilada    'fedora linux'
+    fedora-epel         'fedora epel'
+    fedora-secondary    'fedora secondary arches'
     )
 
 # Default arguments; override in quick-fedora-mirror.conf
@@ -252,10 +261,10 @@ DESTD=
 TIMEFILE=
 
 CHECKIN_HOST=$(hostname)
-CURL=/usr/bin/rsync
+CURL=/usr/bin/curl
 FILELIST='fullfiletimelist-$mdir'
 FFILELIST='fullfilelist'
-MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/checkin
+MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
 REMOTE=rsync://dl.fedoraproject.org
 RSYNC=/usr/bin/rsync
 WARNDELAY=$((60 * 60 * 24))
@@ -379,6 +388,8 @@ if [[ -n $MIRRORBUFFET ]]; then
     # individual modules.
     # ZSHISM (get keys from an associative array with (k))
     MODULES=(${(k)MODULEMAPPING})
+    # BASHEQ MODULES=${!MODULEMAPPING[@]}
+    # bash3 equivalent is terrible
 fi
 
 
@@ -468,6 +479,8 @@ for module in $MODULES; do
     awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module
 
     # All dirs in the remote repository.
+    # XXX This code is duplicated later, and should be pulled into a separate
+    # function.
     awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
                  { if (s && \$2 == \"d\")
                         print \"$moduledir/\" \$4}
@@ -764,19 +777,29 @@ else
     finish
 fi
 
-# Mirrormanager Checkin
-# =====================
-# At this point we know that we had a clean run with no complaints from rsync.
-# So for each module we mirrored, the file list is correct.
-# This means (assuming that no excludes are being passed) that the
-# alldirs-$module file is accurate and we can simply report its contents to
-# mirrormanager.
+# Mirrormanager Checkin and Callout
+# =================================
+# At this point we know that we had a clean run with no complaints from rsync,
+# and as far as we're concerned the run is now complete and recorded.
+#
+#
+#
+#
+# So for each module we mirrored, the filtered file list is correct.  This
+# means that the alldirs-$module file is accurate and we can simply report its
+# contents to mirrormanager.
 if [[ -z $CHECKIN_SITE || -n $skipcheckin ]]; then
     finish
 fi
 
+echo AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa
+pwd
+ls -l
+echo BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+
+
 db2 Performing mirrormanager checkin
-# XXX Log
+logit m "mirrormanager checkin start"
 mm=mirrormanager-payload
 mx=mirrormanager-xmlrpc
 
@@ -789,10 +812,30 @@ echo '{' > $mm
 
 for module in $MODULES; do
     moduledir=$MODULEMAPPING[$module]
+    mmcheckin=$MIRRORMANAGERMAPPING[$module]
+
+    logit M "Processing $module, $moduledir"
+
+    # mirrormanager expects a list of everything we have.  We might not have
+    # seen any changes in the file list and so wouldn't have generated this
+    # file earlier.
+    # XXX This code is duplicated from above, and should be pulled out to a
+    # separate function.
+    if [[ ! -f alldirs-$module ]]; then
+        logit M "Generating dirlist for $module"
+        fl=${FILELIST/'$mdir'/$moduledir}
+        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+            { if (s && \$2 == \"d\")
+                print \"$moduledir/\" \$4}
+                " < $fl > alldirs-$module
+
+        # Filter the list if requested.
+        filter alldirs-$module
+    fi
 
     # The beginning of the json bit
     cat >>$mm <<EOF
-    "$module": {
+    "$mmcheckin": {
         "dirtree": {
 EOF
 
@@ -834,15 +877,11 @@ cat >>$mm <<EOF
 }
 EOF
 
-echo
-echo "Checkin payload"
-cat $mm
-
 # The xmlrpc endpoint requires that the payload be bzip2 compressed
 bzip2 $mm
 
 # base64 encode
-base64 $mm.bz2 > $mm.bz2.b64
+base64 --wrap=0 $mm.bz2 > $mm.bz2.b64
 
 # change '+' to '-'  and '/' to '_'
 tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
@@ -853,25 +892,44 @@ tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
 cat >>$mx <<EOF
 <?xml version='1.0'?>
 <methodCall>
-<methodNme>checkin</methodName>
+<methodName>checkin</methodName>
 <params>
 <param>
-<value><string>
 EOF
+echo -n "<value><string>" >>$mx
+
 cat <$mm.bz2.b64.tr >>$mx
 
 cat >>$mx <<EOF
-</sring></value>
+</string></value>
 </param>
 </params>
 </methodCall>
 EOF
 
-echo
-echo "All checkin data"
-cat $mx
-
 # Now actually upload the payload
-$CURL -H "Content-Type: text/xml" --verbose --data @$mx $MIRRORMANAGER/xmlrpc
+# We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
+logit M "Making xmlrpc call"
+curlopts=(--silent)
+(( VERBOSE >= 4 )) && curlopts=(--verbose)
+$CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
+curlret=$?
+if [[ $curlret -ne 0 ]]; then
+    logit E "Checkin failure: curl returned $curlret"
+    (>&2 echo "Checkin failure: curl returned $curlret")
+    finish
+fi
 
+# Parse the output to see if we got any useful return
+# The sed call attempts to strip xml tags.  Easily fooled but we don't expect
+# any complicated return from mirrormanager.
+sed -e 's/<[^>]*>//g' curl.out > curl.noxml
+grep -q -i successful curl.noxml
+
+if [[ $? -ne 0 ]]; then
+    logit E "Doesn't look like we got a good return from mirrormanager."
+    logit E $(cat curl.noxml)
+fi
+
+logit m "mirrormanager checkin end"
 finish
