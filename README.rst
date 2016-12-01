@@ -42,6 +42,10 @@ six seconds.
 The client preserves file timestamps, but does not preserve directory
 timestamps in all situations.
 
+After a successful mirror run, a mirrormanager checkin can optionaly be done.
+This eliminates the need to run report_mirror, and also avoids another full
+filesystem traversal.
+
 Installation
 ------------
 
@@ -121,12 +125,11 @@ will most likely be far slower.
 The Hardlinker
 ==============
 
-Also included is ``quick-fedora-hardlink`` which, when run on a quiescent
-repository, will find identical files and hardlink them.  This duplicates
-functionality of the existing hardlink tool, but can work more quickly by
-exploiting knowlege of the Fedora repositories, namely that all files which are
-hardlinkable will have identical basenames, identical permissions and identical
-inode ctimes.
+Also included is ``quick-fedora-hardlink`` which will find identical files and
+hardlink them.  This duplicates functionality of the existing hardlink tool,
+but can work more quickly by exploiting knowlege of the Fedora repositories,
+namely that all files which are hardlinkable will have identical basenames,
+identical permissions and identical inode ctimes.
 
 The hardlinker is written in python, though a zsh version with less
 functionality is also in the repository.
@@ -157,15 +160,20 @@ The server must include one file per module to be mirrored (by default named
 running ``create-filelist``.  This will generate a list of all files in the
 specified directory in the proper format and write it to the specified file.
 It is generally best to write this to a temporary location and only move it
-into place if the contents actually changed.  It will also optionally generate
-a simple list of files, as Fedora also maintains such a file.
+into place if the contents actually changed.  In order to avoid additional
+needless filesystem traversals, it will also optionally generate two extra file
+lists not used by the client:
 
-The output contains a timestamp and size for each file.  The timestamp in the
-file list is the newer of mtime and ctime.  This means that newly created
-hardlinks will cause both the original and the new version of the file to
-appear to have been updated.  ``rsync`` will note that the extra files are up
-to date and will create the hardlinks directory (assuming, of course, that it
-is called with ``-H``).  But this works *only* if all of the file lists are
+* A simple list of files, one per line, as Fedora also maintains such a file.
+* A file specifically listing specific types of image files, which is useful for other
+Fedora tools not related to mirroring.
+
+The main file list contains a timestamp and size for each file.  The timestamp
+in the file list is the newer of mtime and ctime.  This means that newly
+created hardlinks will cause both the original and the new version of the file
+to appear to have been updated.  ``rsync`` will note that the extra files are
+up to date and will create the hardlinks directory (assuming, of course, that
+it is called with ``-H``).  But this works *only* if all of the file lists are
 updated at once.
 
 The output also includes a section with checksums of selected files.  By
