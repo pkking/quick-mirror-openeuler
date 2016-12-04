@@ -792,12 +792,6 @@ if [[ -z $CHECKIN_SITE || -n $skipcheckin ]]; then
     finish
 fi
 
-echo AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa
-pwd
-ls -l
-echo BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-
-
 db2 Performing mirrormanager checkin
 logit m "mirrormanager checkin start"
 mm=mirrormanager-payload
