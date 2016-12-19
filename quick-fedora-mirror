@@ -70,7 +70,7 @@ lock () {
 finish () {
     db1 "Mirror finished: $(date)"
     logit R "Run end."
-    if [[ -n $1 ]]; then
+    if [[ -z $1 ]]; then
         cat $outfile
     fi
     exit 0
