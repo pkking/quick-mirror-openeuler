@@ -52,7 +52,7 @@ logwrite () {
 logit () {
     local item=$1
     shift
-    if [[ $LOGITEMS =~ $item || $logitems =~ '@' ]]; then
+    if [[ $LOGITEMS =~ $item || $LOGITEMS =~ '@' ]]; then
        logwrite $*
    fi
    if (( VERBOSE >= 3 )); then
