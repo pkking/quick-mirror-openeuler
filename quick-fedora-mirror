@@ -151,6 +151,7 @@ do_rsync () {
             (>&2 echo rsync returned $rr; this is not recoverable.
                 [[ -f $errlog ]] && cat $errlog
             )
+            break
         fi
     done
 
