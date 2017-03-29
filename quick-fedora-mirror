@@ -127,12 +127,13 @@ do_rsync () {
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         fi
 
-        # We should ignore; 0 (obviously) 24
+        # We should ignore; 0 (obviously), 24
         # If we retried on 24 (missing files on server) we'd never make progress.
         # We should retry: 5 10 23 30 35
         if (( rr == 0 )); then
             break
         elif (( rr == 24 )); then
+            logit e "rsync says source files vanished; ignoring"
             break
         elif (( rr == 5 || rr == 10 || rr == 23 || rr == 30 || rr == 35 )); then
             logit e "rsync returned $rr (retryable), sleeping for $sleep"
