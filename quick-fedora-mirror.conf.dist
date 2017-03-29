@@ -129,6 +129,11 @@ TIMEFILE=
 # transfers.
 # WARNDELAY=$((60 * 60 * 24)) # One day
 
+# When q-f-m encounters an error calling rsync, it may (depending on the error)
+# sleep and retry.  It will always sleep with exponential backup.  Set
+# MAXRETRIES to limit the number of times it retries.
+# MAXRETRIES=10
+
 # mktemp will be called after this file is sourced to make a temporary
 # directory.  This directory can contain a large amount of data, and that data
 # is specified by the server.  If your /tmp is small and you are concerned

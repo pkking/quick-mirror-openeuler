@@ -89,10 +89,10 @@ do_rsync () {
     # If rsync fails, this will sleep with exponential backoff ten times, and
     # then will exit the script (not just the function).
     local src=$1 dest=$2 files=$3 opts=$4
-    local sleep=1
+    local runcount=0
     local log=$(mktemp -p . rsync-out-XXXXXX.log)
     local errlog=$(mktemp -p . rsync-err-XXXXXX.log)
-    local rr rvbash rvzsh
+    local sleep rr rvbash rvzsh
 
     local -a verboseopts
 
@@ -107,6 +107,7 @@ do_rsync () {
     flopts=(--files-from=$files)
 
     while true; do
+        runcount=$(( runcount+1 ))
         # ZSHISM:  (P) flag to act on a variable by name.  Sadly, bash has
         # broken array handling.   bash 4.3 has local -n for this.  Older bash
         # needs hacks, or eval.  More info:
@@ -136,16 +137,17 @@ do_rsync () {
             logit e "rsync says source files vanished; ignoring"
             break
         elif (( rr == 5 || rr == 10 || rr == 23 || rr == 30 || rr == 35 )); then
-            logit e "rsync returned $rr (retryable), sleeping for $sleep"
-            db2 rsync failed: sleeping for $sleep
-            sleep $sleep
-            sleep=$(( sleep*2 ))
-            if (( sleep > 1000 )); then
+            # First see if we've already tried too many times
+            if (( runcount >= MAXRETRIES )); then
                 logit E rsync from $REMOTE/$module failed
                 (>&2 echo "Could not sync from $REMOTE/$module")
                 [[ -f $errlog ]] && (>&2 cat $errlog)
                 exit 1
             fi
+            sleep=$(( 2 ** runcount ))
+            logit e "rsync returned $rr (retryable), sleeping for $sleep"
+            db2 rsync failed: sleeping for $sleep
+            sleep $sleep
         else
             # Some other code we didn't anticipate
             logit E rsync returned $rr.  This is not recoverable.
@@ -270,6 +272,7 @@ MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
 REMOTE=rsync://dl.fedoraproject.org
 RSYNC=/usr/bin/rsync
 WARNDELAY=$((60 * 60 * 24))
+MAXRETRIES=10
 
 rsyncver=$(rsync --version | head -1 | awk '{print $3}')
 if [[ $rsyncver == 3.1* ]]; then
