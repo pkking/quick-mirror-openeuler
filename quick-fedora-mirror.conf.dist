@@ -60,7 +60,6 @@ TIMEFILE=
 # This won't ensure that timestamps are always up to date, but its good enough
 # if you don't modify your repository locally.  Maintaining directory
 # timestamps isn't important for mirroring in any case.
-# Note: Not yet implemented
 # KEEPDIRTIMES=
 
 # DEFINE CHECKIN_SITE and CHECKIN_PASSWORD to perform a mirrormanager checkin
