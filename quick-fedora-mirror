@@ -165,7 +165,10 @@ do_rsync () {
     rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print $4; exit}' $log | sed -e 's/,//g')
 
     # Total bytes received: 2,425,728
-    rstotalbytes=$(awk '/^Total bytes received: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
+    rstotalbytesreceived=$(awk '/^Total bytes received: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
+
+    # Total bytes sent: 384,602
+    rstotalbytessent=$(awk '/^Total bytes sent: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
 
     # File list generation time: 0.308 seconds
     rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print $5; exit}' $log)
