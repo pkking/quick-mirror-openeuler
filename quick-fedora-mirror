@@ -83,6 +83,26 @@ filter () {
     fi
 }
 
+# The main function to do a transfer
+# Accepts four options:
+#   1) The source repository
+#   2) The destination directory
+#   3) The list of files
+#   4) The name of an array containing additional rsync options
+#
+# Returns the last rsync return code; 0 if no error.
+#
+# Will set several global variables, corresponding to the stats block rsync
+# returns after a successful transfer.
+#   rsfilestransferred
+#   rsfilesize
+#   rstotalbytesreceived
+#   rstotalbytessent
+#   rsfilelistgentime
+#   rsfilelisttransfertime
+#   rstransferspeed
+#   rsspeedup
+# These may not be valid, or may be stale, after a failed transfer.
 do_rsync () {
     # Options: source, destination.
     # The name of an array containing additional options.
@@ -142,7 +162,7 @@ do_rsync () {
                 logit E rsync from $REMOTE/$module failed
                 (>&2 echo "Could not sync from $REMOTE/$module")
                 [[ -f $errlog ]] && (>&2 cat $errlog)
-                exit 1
+                return $rr
             fi
             sleep=$(( 2 ** runcount ))
             logit e "rsync returned $rr (retryable), sleeping for $sleep"
@@ -154,7 +174,7 @@ do_rsync () {
             (>&2 echo rsync returned $rr; this is not recoverable.
                 [[ -f $errlog ]] && cat $errlog
             )
-            break
+            return $rr
         fi
     done
 
