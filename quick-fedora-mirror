@@ -688,8 +688,9 @@ if [[ -n $rsyncdryrun ]]; then
     extra+=(-n)
 fi
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted extra
+rsyncreturn=$?
 
-if [[ $? -ne 0 ]]; then
+if [[ $rsyncreturn -ne 0 ]]; then
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
     logit E skipping further operations due to rsync failure
     skipdelete=1

@@ -117,8 +117,8 @@ TIMEFILE=
 # p - per-module module processing start/end
 # r - run start
 # R - run end
-# s - Basic transfer statistics (not impl)
-# S - Detailed transfer statistics (not impl)
+# s - Basic transfer statistics
+# S - Detailed transfer statistics
 # t - directory time updates (not impl)
 # LOGITEMS=aeElrRs
 
