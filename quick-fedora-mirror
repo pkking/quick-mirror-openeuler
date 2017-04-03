@@ -83,6 +83,44 @@ filter () {
     fi
 }
 
+# Produce human-readable byte counts
+# Yes, this has a bug at 1024EB
+hr_b () {
+    typeset -F2 out
+
+    if [[ $1 -lt 1024 ]]; then
+        echo ${1}B
+        return
+    fi
+
+    out=$(( $1 / 1024. ))
+    for unit in KB MB GB TB PB EB; do
+        (( $out < 1024 )) && break
+        out=$(( out / 1024. ))
+    done
+
+    echo ${out}${unit}
+}
+
+# Produce human-readable second counts
+hr_s () {
+    typeset -F2 out=$1
+
+    if [[ $1 -lt 60 ]]; then
+        echo ${1}s
+        return
+    fi
+
+    out=$(( $1 / 60. ))
+    if [[ $out -lt 60 ]]; then
+        echo ${out}m
+        return
+    fi
+
+    out=$(( $out / 60. ))
+    echo ${out}h
+}
+
 # The main function to do a transfer
 # Accepts four options:
 #   1) The source repository
@@ -444,6 +482,15 @@ done
 
 extra=(--no-dirs --relative --compress)
 do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
+rsyncreturn=$?
+if [[ $rsyncreturn -ne 0 ]]; then
+    (>&2 echo "rsync finished with nonzero exit status.\nCould not retrieve file lists.")
+    logit E Aborting due to rsync failure while retrieving file lists
+    finish
+fi
+
+# Log very basic stats
+logit s "File list download: $(hr_b $rstotalbytesreceived) received, $(hr_b $rstransferspeed)/s"
 
 # rsync won't transfer those files to the current directory, so move them and
 # clean up.
