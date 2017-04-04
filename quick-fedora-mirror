@@ -68,6 +68,7 @@ lock () {
 
 # Finish up.  Dump the output file to stdout unless an argument is passed.
 finish () {
+    db1 "========================="
     db1 "Mirror finished: $(date)"
     logit R "Run end."
     if [[ -z $1 ]]; then
