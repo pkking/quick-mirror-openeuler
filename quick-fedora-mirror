@@ -756,22 +756,37 @@ if [[ -n $rsyncdryrun ]]; then
 fi
 do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-transferlist.sorted extra
 rsyncreturn=$?
-
 if [[ $rsyncreturn -ne 0 ]]; then
+    # XXX Why don't we just call finish in here?  It used to work that way, then I changed it, and now I don't remember why.
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
     logit E skipping further operations due to rsync failure
     skipdelete=1
     skipcheckin=1
     rsyncfail=1
+else
+    # Total downloaded file count, bytes received, transfer speed
+    logit s "stat: downloaded $rsfilestransferred files"
+    logit s "stat: received $(hr_b $rstotalbytesreceived)"
+    logit s "stat: transfer speed $(hr_b $rstransferspeed)/s"
+
+    # Everything we can extract from rsync
+    logit S "stat: sent $(hr_b $rstotalbytessent)"
+    logit S "stat: speedup: $rsspeedup"
+    logit S "stat: total size of transferred files: $(hr_b $rsfilesize)"
+    logit S "stat: file list gen time $(hr_s $rsfilelistgentime)"
+    logit S "stat: file list transfer time $(hr_s $rsfilelisttransfertime)"
+
+    db1 "========================="
+    db1 "Main transfer statistics:"
+    db1 "    Downloaded $rsfilestransferred files"
+    db1 "    Total size of those files: $(hr_b $rsfilesize)"
+    db1 "    Received: $(hr_b $rstotalbytesreceived)"
+    db1 "    Sent: $(hr_b $rstotalbytessent)"
+    db1 "    Speedup: $rsspeedup"
+    db1 "    Trasfer speed: $(hr_b $rstransferspeed)/s"
+    db1 "    File list generation time: $(hr_s $rsfilelistgentime)"
+    db1 "    File list transfer time: $(hr_s $rsfilelisttransfertime)"
 fi
-
-# Files: $rsfilestransferred Size: $rsfilesize TransBytes: $rstotalbytes
-
-#echo "XXX Files transferred:    $rsfilestransferred"
-#echo "XXX File size:            $rsfilesize"
-#echo "XXX Total bytes received: $rstotalbytes"
-#echo "XXX File list gen time:   $rsfilelistgentime"
-#echo "XXX File list trans time: $rsfilelisttransfertime"
 
 # Local dir/file deletion
 # =======================
