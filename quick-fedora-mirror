@@ -779,7 +779,7 @@ else
 
     db1 "========================="
     db1 "Main transfer statistics:"
-    db1 "    Downloaded $rsfilestransferred files"
+    db1 "    Downloaded files: $rsfilestransferred"
     db1 "    Total size of those files: $(hr_b $rsfilesize)"
     db1 "    Received: $(hr_b $rstotalbytesreceived)"
     db1 "    Sent: $(hr_b $rstotalbytessent)"
