@@ -32,15 +32,16 @@ db1 () {
     fi
     # Otherwise output nothing....
 }
+db1f () { db1 $(printf $*); }
 
 db2 () { (( VERBOSE >= 2 )) && echo $*}
+db2f () { (( VERBOSE >= 2 )) && printf $*}
 db3 () { (( VERBOSE >= 3 )) && echo '>>' $*}
 db4 () { (( VERBOSE >= 4 )) && echo '>>>>' $*}
 sep () { (( VERBOSE >= 2 )) && echo '============================================================'}
-db2f () { (( VERBOSE >= 2 )) && printf $*}
 
-# Log output
 logwrite () {
+    # Send logging info to the right place
     if [[ -n $LOGJOURNAL ]]; then
         echo $* >&3
     elif [[ -n $LOGFILE && -w $LOGFILE ]]; then
@@ -48,8 +49,8 @@ logwrite () {
     fi
 }
 
-# Basic logging function
 logit () {
+    # Basic logging function
     local item=$1
     shift
     if [[ $LOGITEMS =~ $item || $LOGITEMS =~ '@' ]]; then
@@ -66,8 +67,8 @@ lock () {
     return 1
 }
 
-# Finish up.  Dump the output file to stdout unless an argument is passed.
 finish () {
+    # Finish up.  Dump the output file to stdout unless an argument is passed.
     db1 "========================="
     db1 "Mirror finished: $(date)"
     logit R "Run end."
@@ -122,31 +123,87 @@ hr_s () {
     echo ${out}h
 }
 
-# The main function to do a transfer
-# Accepts four options:
-#   1) The source repository
-#   2) The destination directory
-#   3) The list of files
-#   4) The name of an array containing additional rsync options
-#
-# Returns the last rsync return code; 0 if no error.
-#
-# Will set several global variables, corresponding to the stats block rsync
-# returns after a successful transfer.
-#   rsfilestransferred
-#   rsfilesize
-#   rstotalbytesreceived
-#   rstotalbytessent
-#   rsfilelistgentime
-#   rsfilelisttransfertime
-#   rstransferspeed
-#   rsspeedup
-# These may not be valid, or may be stale, after a failed transfer.
+parse_rsync_stats () {
+    # Parse some of the statistics that rsync gives us.
+    # Takes an rsync output log (stdout) as an argument.
+    # No return value, but sill set several global variables:
+    #   rsfilestransferred
+    #   rsfilesize
+    #   rstotalbytesreceived
+    #   rstotalbytessent
+    #   rsfilelistgentime
+    #   rsfilelisttransfertime
+    #   rstransferspeed
+    #   rsspeedup
+    # These will all be set unset if not present in the given log.
+    #
+    # Here's the full block of info that rsync provides:
+    #
+    # Number of files: 11,140 (reg: 9,344, dir: 1,796)
+    # Number of created files: 1,329 (reg: 1,327, dir: 2)
+    # Number of deleted files: 0
+    # Number of regular files transferred: 1,182
+    # Total file size: 165,405,056,029 bytes
+    # Total transferred file size: 3,615,178,247 bytes
+    # Literal data: 3,229,943,512 bytes
+    # Matched data: 385,234,735 bytes
+    # File list size: 468,791
+    # File list generation time: 0.217 seconds
+    # File list transfer time: 0.000 seconds
+    # Total bytes sent: 1,249,286
+    # Total bytes received: 3,231,373,895
+    #
+    # sent 1,249,286 bytes  received 3,231,373,895 bytes  81,838,561.54 bytes/sec
+    # total size is 165,405,056,029  speedup is 51.17
+
+    local log=$1
+
+    # Number of regular files transferred: 1
+    unset rsfilestransferred
+    rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print $6; exit}' $log)
+
+    # Total file size: 10,174,746 bytes
+    unset rsfilesize
+    rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print $4; exit}' $log | sed -e 's/,//g')
+
+    # Total bytes received: 2,425,728
+    unset rstotalbytesreceived
+    rstotalbytesreceived=$(awk '/^Total bytes received: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
+
+    # Total bytes sent: 384,602
+    unset rstotalbytessent
+    rstotalbytessent=$(awk '/^Total bytes sent: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
+
+    # File list generation time: 0.308 seconds
+    unset rsfilelistgentime
+    rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print $5; exit}' $log)
+
+    # File list transfer time: 0.000 seconds
+    unset rsfilelisttransfertime
+    rsfilelisttransfertime=$(awk '/^File list transfer time: (.*) seconds/ {print $5; exit}' $log)
+
+    # sent 71 bytes  received 2,425,728 bytes  156,503.16 bytes/sec
+    unset rstransferspeed
+    rstransferspeed=$(awk '/^sent .* bytes .* received .* bytes (.*) bytes\/sec$/ {print $7; exit}' $log \
+                      | sed -e 's/,//g')
+
+    # total size is 10,174,746  speedup is 4.19
+    unset rsspeedup
+    rsspeedup=$(awk '/^total size is .* speedup is (.*)$/ {print $7; exit}' $log)
+}
+
 do_rsync () {
-    # Options: source, destination.
-    # The name of an array containing additional options.
-    # If rsync fails, this will sleep with exponential backoff ten times, and
-    # then will exit the script (not just the function).
+    # The main function to do a transfer
+    # Accepts four options:
+    #   1) The source repository
+    #   2) The destination directory
+    #   3) The list of files
+    #   4) The name of an array containing additional rsync options
+    #
+    # This may sleep and retry when receiving an error.
+    # Returns the last rsync return code; 0 if no error.
+    #
+
     local src=$1 dest=$2 files=$3 opts=$4
     local runcount=0
     local log=$(mktemp -p . rsync-out-XXXXXX.log)
@@ -217,87 +274,98 @@ do_rsync () {
         fi
     done
 
-    # Number of regular files transferred: 1
-    rsfilestransferred=$(awk '/^Number of regular files transferred:/ {print $6; exit}' $log)
-
-    # Total file size: 10,174,746 bytes
-    rsfilesize=$(awk '/^Total file size: (.*) bytes/ {print $4; exit}' $log | sed -e 's/,//g')
-
-    # Total bytes received: 2,425,728
-    rstotalbytesreceived=$(awk '/^Total bytes received: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
-
-    # Total bytes sent: 384,602
-    rstotalbytessent=$(awk '/^Total bytes sent: (.*)/ {print $4; exit}' $log | sed -e 's/,//g')
-
-    # File list generation time: 0.308 seconds
-    rsfilelistgentime=$(awk '/^File list generation time: (.*) seconds/ {print $5; exit}' $log)
-
-    # File list transfer time: 0.000 seconds
-    rsfilelisttransfertime=$(awk '/^File list transfer time: (.*) seconds/ {print $5; exit}' $log)
-
-    # sent 71 bytes  received 2,425,728 bytes  156,503.16 bytes/sec
-    rstransferspeed=$(awk '/^sent .* bytes .* received .* bytes (.*) bytes\/sec$/ {print $7; exit}' $log \
-                      | sed -e 's/,//g')
-
-    # total size is 10,174,746  speedup is 4.19
-    rsspeedup=$(awk '/^total size is .* speedup is (.*)$/ {print $7; exit}' $log)
-
     logit C rsync call completed succesfully with return $rr
 
+    parse_rsync_stats $log
     return $rr
 }
 
+parse_args () {
+    # Process arguments, setting all sorts of globals
+    while [[ $# > 0 ]]; do
+        opt=$1
+        case $opt in
+            -a)
+                alwayscheck=1
+                ;;
+            -c)
+                cfgfile=$2
+                shift
+                if [[ ! -r $cfgfile ]]; then
+                    (>&2 echo Cannot read $cfgfile)
+                    exit 1
+                fi
+                ;;
+            -d) # Debugging
+                verboseopt=$2
+                shift
+                ;;
+            -n)
+                rsyncdryrun=1
+                skipdelete=1
+                skiptimestamp=1
+                ;;
+            -N)
+                skipdelete=1
+                skiptimestamp=1
+                ;;
+            -t)
+                backdate=$2
+                alwayscheck=1
+                shift
+                ;;
+            -T)
+                backdate=$(date -d "$2" +%s)
+                alwayscheck=1
+                shift
+                ;;
+            --dir-times)
+                updatealldirtimes=1
+                ;;
+            *)
+                (>&2 echo "Unrecognized argument.")
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+
+}
+
+read_config () {
+    # Load up the configuration file from any of a number of locations
+    local file
+    for file in \
+        $cfgfile \
+        /etc/quick-fedora-mirror.conf \
+        ~/.config/quick-fedora-mirror.conf \
+        $(dirname $0)/quick-fedora-mirror.conf \
+        ./quick-fedora-mirror.conf; \
+    do
+        if [[ -r $file ]]; then
+            source $file
+            cfgfile=$file
+            break
+        fi
+    done
+
+    # Override some settings with previously parsed command-line options
+    [[ -n $verboseopt ]] && VERBOSE=$verboseopt
+
+    # Check that the required parameters were provided
+    if [[ -z $DESTD ]]; then
+        (>&2 echo "You must define DESTD in your configuration file ($cfgfile).")
+    fi
+    if [[ -z $TIMEFILE ]]; then
+        (>&2 echo "You must define TIMEFILE in your configuration file ($cfgfile).")
+    fi
+}
+
+
 # Main program execution
 # ======================
-
-# Parse args
-while [[ $# > 0 ]]; do
-    opt=$1
-    case $opt in
-        -a)
-            alwayscheck=1
-            ;;
-        -c)
-            cfgfile=$2
-            shift
-            if [[ ! -r $cfgfile ]]; then
-                (>&2 echo Cannot read $cfgfile)
-                exit 1
-            fi
-            ;;
-        -d) # Debugging
-            verboseopt=$2
-            shift
-            ;;
-        -n)
-            rsyncdryrun=1
-            skipdelete=1
-            skiptimestamp=1
-            ;;
-        -N)
-            skipdelete=1
-            skiptimestamp=1
-            ;;
-        -t)
-            backdate=$2
-            alwayscheck=1
-            shift
-            ;;
-        -T)
-            backdate=$(date -d "$2" +%s)
-            alwayscheck=1
-            shift
-            ;;
-        --dir-times)
-            updatealldirtimes=1
-            ;;
-        *)
-            (>&2 echo "Unrecognized argument.")
-            exit 1
-            ;;
-    esac
-    shift
-done
+parse_args "$@"
 
 # Mapping from module names to directories under fedora-buffet
 # ZSHISM (initialize associative array)
@@ -346,28 +414,7 @@ fi
 MASTERMODULE=fedora-buffet
 MODULES=(fedora-enchilada fedora-epel)
 
-# Load up the configuration file
-for file in $cfgfile /etc/quick-fedora-mirror.conf \
-        ~/.config/quick-fedora-mirror.conf \
-        $(dirname $0)/quick-fedora-mirror.conf \
-        ./quick-fedora-mirror.conf; do
-    if [[ -r $file ]]; then
-        source $file
-        cfgfile=$file
-        break
-    fi
-done
-
-# Override with the command-line option
-[[ -n $verboseopt ]] && VERBOSE=$verboseopt
-
-# Check that the required parameters were provided
-if [[ -z $DESTD ]]; then
-    (>&2 echo "You must define DESTD in your configuration file ($cfgfile).")
-fi
-if [[ -z $TIMEFILE ]]; then
-    (>&2 echo "You must define TIMEFILE in your configuration file ($cfgfile).")
-fi
+read_config
 
 # Find the previous mirror time, and backdate if necessary
 LASTTIME=0
