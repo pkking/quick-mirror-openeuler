@@ -508,7 +508,8 @@ checkin_module () {
     # everything.
     # ZSHISM: This uses "(P)"; the equivalent in bash is "!".
     local checkinhost=$CHECKIN_HOST
-    local hostspecificvar=CHECKIN_HOST_$module
+    local hostspecificvar=CHECKIN_HOST_${module://-/_}
+
     if [[ -n ${(P)hostspecificvar} ]]; then
         checkinhost=${(P)hostspecificvar}
     fi
