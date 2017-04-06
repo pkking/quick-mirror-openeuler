@@ -485,6 +485,132 @@ fetch_file_lists () {
 }
 
 
+# XXX
+checkin_module () {
+    # Perform the mirrormanager checkin for a particular module
+    local module=$1
+
+    local mm=mirrormanager-payload-$module
+    local mx=mirrormanager-xmlrpc-$module
+    local moduledir=$MODULEMAPPING[$module]
+    local mmcheckin=$MIRRORMANAGERMAPPING[$module]
+
+    if [[ ! -f alldirs-$module ]]; then
+        # We were asked to check in a module that we hadn't previously
+        # processed, which should not happen.
+        logit E "Cannot perform checkin for $module; no directory list exists."
+        return
+    fi
+    # Determine the "mirrormanager hostname" to use for this checkin.
+    # Different modules can be set up under different "hosts" in mirrormanager,
+    # even though these might all be on the same machine.  This works around
+    # problems mirrormanager has when crawling machines which mirror
+    # everything.
+    # ZSHISM: This uses "(P)"; the equivalent in bash is "!".
+    local checkinhost=$CHECKIN_HOST
+    local hostspecificvar=CHECKIN_HOST_$module
+    if [[ -n ${(P)hostspecificvar} ]]; then
+        checkinhost=${(P)hostspecificvar}
+    fi
+
+    db3 "Performing mirrormanager checkin for $module (in $moduledir) as $checkinhost"
+    logit M "Processing $module (in $moduledir) as $checkinhost"
+
+    # First construct the checkin payload
+    cat >$mm <<EOF
+{
+    "$mmcheckin": {
+        "dirtree": {
+EOF
+
+    # Output the data for each directory.  MM doesn't want the
+    # directory name.
+    for l in $(cat alldirs-$module); do
+        echo "\"${l/$moduledir\/}\": {}" >>$mm
+    done
+
+    # The data sent by report_mirror always includes a blank directory; add it
+    # manually here which conveniently means we don't have to deal with the
+    # trailing comma.  And after that, the various parameters mirrormanager
+    # wants.
+    cat >>$mm <<EOF
+            "": {}
+        },
+        "enabled": "1"
+    },
+    "global": {
+        "enabled": "1",
+        "server": "$MIRRORMANAGER"
+    },
+    "host": {
+        "enabled": "1",
+        "name": "$checkinhost"
+    },
+    "site": {
+        "enabled": "1",
+        "name": "$CHECKIN_SITE",
+        "password": "$CHECKIN_PASSWORD"
+    },
+    "stats": {},
+    "version": 0
+}
+EOF
+
+    # The xmlrpc endpoint requires that the payload be bzip2 compressed
+    bzip2 $mm
+
+    # base64 encode
+    base64 --wrap=0 $mm.bz2 > $mm.bz2.b64
+
+    # change '+' to '-'  and '/' to '_'
+    tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
+
+    # Wrap the transformed, base64 encoded bzip2 compressed json payload in just
+    # the right xml
+    cat >>$mx <<EOF
+<?xml version='1.0'?>
+<methodCall>
+<methodName>checkin</methodName>
+<params>
+<param>
+EOF
+    echo -n "<value><string>" >>$mx
+
+    cat <$mm.bz2.b64.tr >>$mx
+
+    cat >>$mx <<EOF
+</string></value>
+</param>
+</params>
+</methodCall>
+EOF
+
+    # Now actually upload the payload
+    # We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
+    logit M "Making xmlrpc call for $module"
+    curlopts=(--silent)
+    (( VERBOSE >= 4 )) && curlopts=(--verbose)
+    $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
+    curlret=$?
+    if [[ $curlret -ne 0 ]]; then
+        logit E "Checkin failure: curl returned $curlret"
+        (>&2 echo "Checkin failure: curl returned $curlret")
+        finish
+    fi
+
+    # Parse the output to see if we got any useful return
+    # The sed call attempts to strip xml tags.  Easily fooled but we don't expect
+    # any complicated return from mirrormanager.
+    sed -e 's/<[^>]*>//g' curl.out > curl.noxml
+    grep -q -i successful curl.noxml
+
+    if [[ $? -ne 0 ]]; then
+        logit E "Doesn't look like we got a good return from mirrormanager."
+        logit E $(cat curl.noxml)
+    fi
+    logit M "Processing $module: end"
+}
+
 # Main program execution
 # ======================
 parse_args "$@"
@@ -966,136 +1092,11 @@ fi
 
 db2 Performing mirrormanager checkin
 logit m "mirrormanager checkin start"
-mm=mirrormanager-payload
-mx=mirrormanager-xmlrpc
 
-# First construct the checkin payload
-
-# The json produced by report_mirror will start with a bracket, followed by
-# info for each module, followed by some data relating to the host and site
-# being reported.
-echo '{' > $mm
-
+# XXX This will always try to check in everything, which will cause errors
 for module in $MODULES; do
-    moduledir=$MODULEMAPPING[$module]
-    mmcheckin=$MIRRORMANAGERMAPPING[$module]
-
-    logit M "Processing $module, $moduledir"
-
-    # mirrormanager expects a list of everything we have.  We might not have
-    # seen any changes in the file list and so wouldn't have generated this
-    # file earlier.
-    # XXX This code is duplicated from above, and should be pulled out to a
-    # separate function.
-    if [[ ! -f alldirs-$module ]]; then
-        logit M "Generating dirlist for $module"
-        fl=${FILELIST/'$mdir'/$moduledir}
-        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
-            { if (s && \$2 == \"d\")
-                print \"$moduledir/\" \$4}
-                " < $fl > alldirs-$module
-
-        # Filter the list if requested.
-        filter alldirs-$module
-    fi
-
-    # The beginning of the json bit
-    cat >>$mm <<EOF
-    "$mmcheckin": {
-        "dirtree": {
-EOF
-
-    # Output the data for each directory.  MM doesn't want the
-    # directory name.
-    for l in $(cat alldirs-$module); do
-        cat >>$mm <<EOF
-            "${l/$moduledir\/}": {},
-EOF
-    done
-
-    # The data sent by report_mirror always includes a blank directory; add it
-    # manually here which conveniently means we don't have to deal with the
-    # trailing comma.
-    cat >>$mm <<EOF
-            "": {}
-        },
-        "enabled": "1"
-    },
-EOF
+    checkin_module $module
 done
-
-cat >>$mm <<EOF
-    "global": {
-        "enabled": "1",
-        "server": "$MIRRORMANAGER"
-    },
-    "host": {
-        "enabled": "1",
-        "name": "$CHECKIN_HOST"
-    },
-    "site": {
-        "enabled": "1",
-        "name": "$CHECKIN_SITE",
-        "password": "$CHECKIN_PASSWORD"
-    },
-    "stats": {},
-    "version": 0
-}
-EOF
-
-# The xmlrpc endpoint requires that the payload be bzip2 compressed
-bzip2 $mm
-
-# base64 encode
-base64 --wrap=0 $mm.bz2 > $mm.bz2.b64
-
-# change '+' to '-'  and '/' to '_'
-tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
-
-# Wrap the transformed, base64 encoded bzip2 compressed json payload in just
-# the right xml
-# XXX I hope that newlines are allowed inside the <string> block.
-cat >>$mx <<EOF
-<?xml version='1.0'?>
-<methodCall>
-<methodName>checkin</methodName>
-<params>
-<param>
-EOF
-echo -n "<value><string>" >>$mx
-
-cat <$mm.bz2.b64.tr >>$mx
-
-cat >>$mx <<EOF
-</string></value>
-</param>
-</params>
-</methodCall>
-EOF
-
-# Now actually upload the payload
-# We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
-logit M "Making xmlrpc call"
-curlopts=(--silent)
-(( VERBOSE >= 4 )) && curlopts=(--verbose)
-$CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
-curlret=$?
-if [[ $curlret -ne 0 ]]; then
-    logit E "Checkin failure: curl returned $curlret"
-    (>&2 echo "Checkin failure: curl returned $curlret")
-    finish
-fi
-
-# Parse the output to see if we got any useful return
-# The sed call attempts to strip xml tags.  Easily fooled but we don't expect
-# any complicated return from mirrormanager.
-sed -e 's/<[^>]*>//g' curl.out > curl.noxml
-grep -q -i successful curl.noxml
-
-if [[ $? -ne 0 ]]; then
-    logit E "Doesn't look like we got a good return from mirrormanager."
-    logit E $(cat curl.noxml)
-fi
 
 logit m "mirrormanager checkin end"
 finish
