@@ -500,6 +500,7 @@ checkin_module () {
         logit E "Cannot perform checkin for $module; no directory list exists."
         return
     fi
+
     # Determine the "mirrormanager hostname" to use for this checkin.
     # Different modules can be set up under different "hosts" in mirrormanager,
     # even though these might all be on the same machine.  This works around
@@ -507,8 +508,7 @@ checkin_module () {
     # everything.
     # ZSHISM: This uses "(P)"; the equivalent in bash is "!".
     local checkinhost=$CHECKIN_HOST
-    local hostspecificvar=CHECKIN_HOST_${module://-/_}
-
+    local hostspecificvar=CHECKIN_HOST_${module//-/_}
     if [[ -n ${(P)hostspecificvar} ]]; then
         checkinhost=${(P)hostspecificvar}
     fi
@@ -605,6 +605,7 @@ EOF
     grep -q -i successful curl.noxml
 
     if [[ $? -ne 0 ]]; then
+        db1 "Mirrormanager checkin did not appear to succeed."
         logit E "Doesn't look like we got a good return from mirrormanager."
         logit E $(cat curl.noxml)
     fi
