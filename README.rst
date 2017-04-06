@@ -43,8 +43,8 @@ The client preserves file timestamps, but does not preserve directory
 timestamps in all situations.
 
 After a successful mirror run, the client can optionally perform a
-mirrormanager checkin.  This eliminates the need to run report_mirror, and also
-avoids another full filesystem traversal.
+mirrormanager checkin for each changed module.  This eliminates the need to run
+report_mirror, and also avoids another full filesystem traversal.
 
 Installation
 ------------
@@ -70,10 +70,11 @@ rest of the directory structure will be created there as necessary.
 Options
 -------
 
--a  Always check the file list.  This disables the optimization in which the
-    file list isn't processed at all if it hasn't changed from the local copy.
-    Useful if you believe that some files have gone missing from your
-    repository and you want to force them to be fetched.
+-a  Always check the file list, and always check in all modules.  This disables
+    the optimization in which the file list isn't processed at all if it hasn't
+    changed from the local copy.  Useful if you believe that some files have
+    gone missing from your repository and you want to force them to be fetched,
+    or if you want to force a checkin.
 
 -c  Configuration file to use.
 
