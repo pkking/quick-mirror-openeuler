@@ -70,10 +70,19 @@ TIMEFILE=
 # CHECKIN_PASSWORD=
 # CHECKIN_HOST=
 
+# If you have configured multiple mirrormanager hostnames to and virtually
+# spread the modules/categories you mirror between them, then you can configure
+# per-module checkin hosts as follows.  If you don't, then the CHECKIN_HOST you
+# set above, or the default, will apply.  Note that the module name is used,
+# not the mirrormanager category, and that '-' in the module name is replaced
+# by '_' to make a legal variable name.
+# CHECKIN_HOST_fedora_archive
+# CHECKIN_HOST_fedora_alt
+
 # Verbosity levels - info sent to stdout; usually this gets mailed to root when
 # being run by cron
 # 0 - quiet
-# 1 - start and end times
+# 1 - quiet if no changes, otherwise basic transfer info
 # 2 - no -q to rsync
 # 3 - very slightly more verbosity
 # 4 - One -v to rsync
