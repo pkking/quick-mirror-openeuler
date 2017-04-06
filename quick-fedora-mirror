@@ -85,9 +85,9 @@ filter () {
     fi
 }
 
-# Produce human-readable byte counts
-# Yes, this has a bug at 1024EB
 hr_b () {
+    # Produce human-readable byte counts
+    # Yes, this has a bug at 1024EB
     typeset -F2 out
 
     if [[ $1 -lt 1024 ]]; then
@@ -104,8 +104,8 @@ hr_b () {
     echo ${out}${unit}
 }
 
-# Produce human-readable second counts
 hr_s () {
+    # Produce human-readable second counts
     typeset -F2 out=$1
 
     if [[ $1 -lt 60 ]]; then
@@ -362,16 +362,14 @@ read_config () {
     fi
 }
 
+set_default_vars () {
+    # Set various defaults before the configuration file is loaded.
 
-# Main program execution
-# ======================
-parse_args "$@"
-
-# Mapping from module names to directories under fedora-buffet
-# ZSHISM (initialize associative array)
-typeset -A MODULEMAPPING
-typeset -A MIRRORMANAGERMAPPING
-MODULEMAPPING=(
+    # Mapping from module names to directories under fedora-buffet
+    # ZSHISM (initialize associative array)
+    typeset -g -A MODULEMAPPING
+    typeset -g -A MIRRORMANAGERMAPPING
+    MODULEMAPPING=(
     fedora-alt          alt
     fedora-archive      archive
     fedora-enchilada    fedora
@@ -379,7 +377,7 @@ MODULEMAPPING=(
     fedora-secondary    fedora-secondary
     )
 
-MIRRORMANAGERMAPPING=(
+    MIRRORMANAGERMAPPING=(
     fedora-alt          'fedora other'
     fedora-archive      'fedora archive'
     fedora-enchilada    'fedora linux'
@@ -387,32 +385,85 @@ MIRRORMANAGERMAPPING=(
     fedora-secondary    'fedora secondary arches'
     )
 
-# Default arguments; override in quick-fedora-mirror.conf
-VERBOSE=0
-LOGITEMS=aeElrR
+    # Default arguments; override in quick-fedora-mirror.conf
+    VERBOSE=0
+    LOGITEMS=aeElrR
 
-DESTD=
-TIMEFILE=
+    DESTD=
+    TIMEFILE=
 
-CHECKIN_HOST=$(hostname)
-CURL=/usr/bin/curl
-FILELIST='fullfiletimelist-$mdir'
-FFILELIST='fullfilelist'
-MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
-REMOTE=rsync://dl.fedoraproject.org
-RSYNC=/usr/bin/rsync
-WARNDELAY=$((60 * 60 * 24))
-MAXRETRIES=10
+    CHECKIN_HOST=$(hostname)
+    CURL=/usr/bin/curl
+    FILELIST='fullfiletimelist-$mdir'
+    FFILELIST='fullfilelist'
+    MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
+    REMOTE=rsync://dl.fedoraproject.org
+    RSYNC=/usr/bin/rsync
+    WARNDELAY=$((60 * 60 * 24))
+    MAXRETRIES=10
 
-rsyncver=$(rsync --version | head -1 | awk '{print $3}')
-if [[ $rsyncver == 3.1* ]]; then
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
-else
-    RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
-fi
+    rsyncver=$(rsync --version | head -1 | awk '{print $3}')
+    if [[ $rsyncver == 3.1* ]]; then
+        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
+    else
+        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
+    fi
 
-MASTERMODULE=fedora-buffet
-MODULES=(fedora-enchilada fedora-epel)
+    MASTERMODULE=fedora-buffet
+    MODULES=(fedora-enchilada fedora-epel)
+}
+
+fetch_file_lists () {
+    # Download the file list for each configred module
+    # Will set the global variable "checksums" containing the checksum of the
+    # file list of each module.
+
+    local extra flname module rsyncreturn
+
+    sep
+    logit o Remote file list download start
+    db2 Downloading file lists
+    # ZSHISM (declare associative array)
+    typeset -g -A checksums
+    for module in $MODULES; do
+        # ZSHISM? (associative array indexing)
+        moduledir=$MODULEMAPPING[$module]
+        mkdir $moduledir
+        flname=${FILELIST/'$mdir'/$moduledir}
+        if [[ -f $DESTD/$moduledir/$flname ]]; then
+            cp -p $DESTD/$moduledir/$flname $moduledir
+            # ZSHISM (assign assoc. array value)
+            checksums[$module]=$(sha1sum $DESTD/$moduledir/$flname | cut -d' ' -f1)
+        fi
+
+        echo $moduledir/$flname >> filelist-transferlist
+    done
+
+    extra=(--no-dirs --relative --compress)
+    do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
+    rsyncreturn=$?
+    if [[ $rsyncreturn -ne 0 ]]; then
+        (>&2 echo "rsync finished with nonzero exit status.\nCould not retrieve file lists.")
+        logit E Aborting due to rsync failure while retrieving file lists
+        finish
+    fi
+
+    # Log very basic stats
+    logit s "File list download: $(hr_b $rstotalbytesreceived) received, $(hr_b $rstransferspeed)/s"
+
+    # rsync won't transfer those files to the current directory, so move them and
+    # clean up.
+    mv */* .
+    rmdir * 2> /dev/null
+    logit o Remote file list download: end
+}
+
+
+# Main program execution
+# ======================
+parse_args "$@"
+
+set_default_vars
 
 read_config
 
@@ -506,45 +557,7 @@ if [[ -n $MIRRORBUFFET ]]; then
     # bash3 equivalent is terrible
 fi
 
-
-# Master file list fetching
-# =========================
-sep
-logit o Remote file list download start
-db2 Downloading file lists
-# ZSHISM (declare associative array)
-typeset -A checksums
-for module in $MODULES; do
-    # ZSHISM? (associative array indexing)
-    moduledir=$MODULEMAPPING[$module]
-    mkdir $moduledir
-    flname=${FILELIST/'$mdir'/$moduledir}
-    if [[ -f $DESTD/$moduledir/$flname ]]; then
-        cp -p $DESTD/$moduledir/$flname $moduledir
-        # ZSHISM (assign assoc. array value)
-        checksums[$module]=$(sha1sum $DESTD/$moduledir/$flname | cut -d' ' -f1)
-    fi
-
-    echo $moduledir/$flname >> filelist-transferlist
-done
-
-extra=(--no-dirs --relative --compress)
-do_rsync $REMOTE/$MASTERMODULE/ . filelist-transferlist extra
-rsyncreturn=$?
-if [[ $rsyncreturn -ne 0 ]]; then
-    (>&2 echo "rsync finished with nonzero exit status.\nCould not retrieve file lists.")
-    logit E Aborting due to rsync failure while retrieving file lists
-    finish
-fi
-
-# Log very basic stats
-logit s "File list download: $(hr_b $rstotalbytesreceived) received, $(hr_b $rstransferspeed)/s"
-
-# rsync won't transfer those files to the current directory, so move them and
-# clean up.
-mv */* .
-rmdir * 2> /dev/null
-logit o Remote file list download: end
+fetch_file_lists
 
 # File list generation
 # ====================
