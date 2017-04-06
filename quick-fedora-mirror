@@ -1094,7 +1094,7 @@ db2 Performing mirrormanager checkin
 logit m "mirrormanager checkin start"
 
 # XXX This will always try to check in everything, which will cause errors
-for module in $MODULES; do
+for module in $CHANGED_MODULES; do
     checkin_module $module
 done
 
