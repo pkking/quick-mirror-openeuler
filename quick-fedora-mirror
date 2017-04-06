@@ -78,8 +78,8 @@ finish () {
     exit 0
 }
 
-# Client-side file list filtering.
 filter () {
+    # Client-side file list filtering.
     if [[ -n $FILTEREXP ]]; then
         sed -i -r -e "\,$FILTEREXP,d" $1
     fi
@@ -138,6 +138,32 @@ parse_rsync_stats () {
     # These will all be set unset if not present in the given log.
     #
     # Here's the full block of info that rsync provides:
+    #
+    # rsync[30399] (receiver) heap statistics:
+    #   arena:         311296   (bytes from sbrk)
+    #   ordblks:            2   (chunks not in use)
+    #   smblks:             1
+    #   hblks:              2   (chunks from mmap)
+    #   hblkhd:        532480   (bytes from mmap)
+    #   allmem:        843776   (bytes from sbrk + mmap)
+    #   usmblks:            0
+    #   fsmblks:           48
+    #   uordblks:      178272   (bytes used)
+    #   fordblks:      133024   (bytes free)
+    #   keepcost:      131200   (bytes in releasable chunk)
+    #
+    # rsync[30394] (generator) heap statistics:
+    #   arena:         311296   (bytes from sbrk)
+    #   ordblks:            2   (chunks not in use)
+    #   smblks:             1
+    #   hblks:              2   (chunks from mmap)
+    #   hblkhd:        532480   (bytes from mmap)
+    #   allmem:        843776   (bytes from sbrk + mmap)
+    #   usmblks:            0
+    #   fsmblks:           48
+    #   uordblks:      178208   (bytes used)
+    #   fordblks:      133088   (bytes free)
+    #   keepcost:      131200   (bytes in releasable chunk)
     #
     # Number of files: 11,140 (reg: 9,344, dir: 1,796)
     # Number of created files: 1,329 (reg: 1,327, dir: 2)
