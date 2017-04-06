@@ -437,6 +437,7 @@ set_default_vars () {
 
     MASTERMODULE=fedora-buffet
     MODULES=(fedora-enchilada fedora-epel)
+    CHANGED_MODULES=()
 }
 
 fetch_file_lists () {
@@ -484,8 +485,6 @@ fetch_file_lists () {
     logit o Remote file list download: end
 }
 
-
-# XXX
 checkin_module () {
     # Perform the mirrormanager checkin for a particular module
     local module=$1
@@ -527,7 +526,7 @@ EOF
     # Output the data for each directory.  MM doesn't want the
     # directory name.
     for l in $(cat alldirs-$module); do
-        echo "\"${l/$moduledir\/}\": {}" >>$mm
+        echo "            \"${l/$moduledir\/}\": {}," >>$mm
     done
 
     # The data sent by report_mirror always includes a blank directory; add it
@@ -609,15 +608,14 @@ EOF
         logit E "Doesn't look like we got a good return from mirrormanager."
         logit E $(cat curl.noxml)
     fi
+
     logit M "Processing $module: end"
 }
 
 # Main program execution
 # ======================
 parse_args "$@"
-
 set_default_vars
-
 read_config
 
 # Find the previous mirror time, and backdate if necessary
@@ -737,6 +735,7 @@ for module in $MODULES; do
     sep
     logit P Processing start: $module
     db2 Processing $module
+    CHANGED_MODULES+=$module
 
     flversion=$(awk -F '\t' '/^\[Version/ {s=1; next} /^$/ {exit} {if (s) print $0}' < $fl)
     if [[ "$flversion" -gt 3 ]]; then
@@ -935,7 +934,7 @@ for module in $MODULES; do
 
     logit P Processing end: $module
     db2 Finished processing $module.
-    db2 After removing duplicates, $cnttotaltransfer files and dirs were added to the transfer list.
+    db2 After removing duplicates, $cnttotaltransfer files/dirs were added to the transfer list.
 
     # Clean up a bit.
     # XXX We need at least the dirlists for the checkin
