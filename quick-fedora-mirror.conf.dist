@@ -66,7 +66,6 @@ TIMEFILE=
 # at the completion of the run if rsync succeeded without error.
 # CHECKIN_HOST will default to the output of the hostname command.   Set it if necessary.
 # This requires that "curl" be installed; see CURL above if it's not in /usr/bin.
-# Note: Not yet implemented; mirrormanager does not yet support this.
 # CHECKIN_SITE=
 # CHECKIN_PASSWORD=
 # CHECKIN_HOST=
