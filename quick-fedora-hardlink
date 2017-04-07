@@ -222,29 +222,29 @@ def do_hardlink(target, link):
     try:
         os.rename(link, tmp)
     except os.error:
-        print('Could not rename {} to {}.  Aborting.'.format(link, tmp), file=sys.stderr)
+        print('Could not rename {} to {}.  Aborting.\033[K'.format(link, tmp), file=sys.stderr)
         os.remove(tmp)
         sys.exit(1)
 
     try:
         os.link(target, link)
     except os.error as e:
-        print('Could not link from {} to {}: {}.\nTrying to undo the rename.'.format(link, target, e),
+        print('Could not link from {} to {}: {}.\033[K\nTrying to undo the rename.'.format(link, target, e),
             file=sys.stderr)
         try:
             os.rename(tmp, link)
         except os.error as e:
-            print('Cound not rename {} to {}: {}.  You will need to fix things up manually.'.format(
+            print('Cound not rename {} to {}: {}.  You will need to fix things up manually.\033[K'.format(
                 tmp, link, e), file=sys.stderr)
             sys.exit(1)
 
-        print('Undid the rename.', file=sys.stderr)
+        print('Undid the rename.\033[K', file=sys.stderr)
         sys.exit(1)
 
     try:
         os.remove(tmp)
     except os.error as e:
-        print('Cound not remove tempfile {}: {}.'.format(tmp, e), file=sys.stderr)
+        print('Cound not remove tempfile {}: {}.\033[K'.format(tmp, e), file=sys.stderr)
         sys.exit(1)
 
 
@@ -321,7 +321,13 @@ def process_candidates(candidates, skip=False, verbose=False):
             else:
                 left = '{:.1f}h'.format(timeleftestimate / (60 ** 2))
 
-        if count % 25 == 0:
+        (linked, alreadylinked, saved) = process_one_candidate(target, candidate, skip=skip, verbose=verbose)
+        linkedtotal += linked
+        alreadylinkedtotal += alreadylinked
+        savedtotal += saved
+        count += 1
+
+        if count % 25 == 0 or linked != 0:
             # Total (pct) - existing links - new links - saved - time estimate
             uprint('{:7} tuples ({:2.2%})'
                    ' - links: ({} exist, {} new)'
@@ -333,11 +339,6 @@ def process_candidates(candidates, skip=False, verbose=False):
                            (savedtotal / 1024 ** 3),
                            left)
                    )
-        (linked, alreadylinked, saved) = process_one_candidate(target, candidate, skip=skip, verbose=verbose)
-        linkedtotal += linked
-        alreadylinkedtotal += alreadylinked
-        savedtotal += saved
-        count += 1
 
     return (linkedtotal, savedtotal)
 
