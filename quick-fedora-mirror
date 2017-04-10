@@ -605,7 +605,7 @@ EOF
     grep -q -i successful curl.noxml
 
     if [[ $? -ne 0 ]]; then
-        db1 "Mirrormanager checkin did not appear to succeed."
+        db1 "Mirrormanager checkin for $module did not appear to succeed."
         logit E "Doesn't look like we got a good return from mirrormanager."
         logit E $(cat curl.noxml)
     fi
