@@ -935,7 +935,14 @@ for module in $MODULES; do
 
     logit P Processing end: $module
     db2 Finished processing $module.
-    db2 After removing duplicates, $cnttotaltransfer files/dirs were added to the transfer list.
+
+    # Some basic info about the transfer.
+    db1 Changes in $module: $cnttotaltransfer files/dirs
+    if (( cnttotaltransfer <= 5 )); then
+        for i in $(cat transferlist-sorted-$module); do
+            db1 "    $i"
+        done
+    fi
 
     # Clean up a bit.
     # XXX We need at least the dirlists for the checkin
