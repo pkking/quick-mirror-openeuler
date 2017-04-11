@@ -22,7 +22,6 @@ from __future__ import print_function, division
 #   module together when linking occurs.
 
 import argparse
-# import fcntl
 import os
 import re
 import sys
@@ -45,6 +44,10 @@ def options_parse():
                    help='Just print what would be done without linking anything.')
     p.add_argument('--no-ctime', action='store_true',
                    help='Do not skip files which have different ctimes in the file lists.')
+    p.add_argument('-q', '--quiet', action='store_true',
+                   help='Print nothing to standard output except the end-of-run summary.')
+    p.add_argument('-s', '--silent', action='store_true',
+                   help='Print nothing at all to standard output.')
     p.add_argument('-v', '--verbose', action='store_true',
                    help='Print the source and dest of each hardlink created.')
 
@@ -288,7 +291,7 @@ def process_one_candidate(target, l, skip=False, verbose=False):
         saved += tstat.st_size
 
         if verbose:
-            uprint('Hardlink {}\n    and {}\n'.format(target, candidate))
+            uprint('Link {}\n and {}\n'.format(target, candidate))
 
     return (linked, alreadylinked, saved)
 
