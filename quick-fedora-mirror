@@ -944,8 +944,10 @@ for module in $MODULES; do
         done
     fi
 
-    # Clean up a bit.
-    # XXX We need at least the dirlists for the checkin
+    # XXX We should clean some things up at this point, but we also need some
+    # files for the checkin later.
+    # Should be able to delete all *-$module, except for the dirlists, to give
+    # the current mirrormanager versions the things it needs.
     #if (( VERBOSE <= 4 )); then
     #    rm *-$module
     #fi
