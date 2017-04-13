@@ -11,6 +11,7 @@ from __future__ import print_function
 import argparse
 import hashlib
 import os
+import stat
 import sys
 from scandir import scandir
 
@@ -25,9 +26,17 @@ def get_ftype(entry):
     """Return a simple indicator of the file type."""
     if entry.is_symlink():
         return 'l'
+
+    # Check world-readability and add a '-' to the file type for things which
+    # have restricted permissions.
+    m = ''
+    if not (entry.stat().st_mode & stat.S_IROTH):
+        # print('{} not world readable'.format(entry.path))
+        m = '-'
+
     if entry.is_dir():
-        return 'd'
-    return 'f'
+        return 'd' + m
+    return 'f' + m
 
 
 def sha1(fname):
@@ -53,6 +62,16 @@ def recursedir(path='.', skip=[], alwaysskip=['.~tmp~']):
             continue
         if entry.name in alwaysskip:
             continue
+
+        # Skip things which are not at least group readable
+
+        # Symlinks are followed here so that clients won't see dangling
+        # symlinks to content they can't transfer.  It's the default, but to
+        # avoid confusion it's been made explicit.
+        if not (entry.stat(follow_symlinks=True).st_mode & stat.S_IRGRP):
+            # print('{} is not group readable; skipping.'.format(entry.path))
+            continue
+
         if entry.is_dir(follow_symlinks=False):
             # Don't pass skip here, because we only skip in the top level
             for rentry in recursedir(entry.path, alwaysskip=alwaysskip):
@@ -115,24 +134,32 @@ def main():
     os.chdir(opts.dir)
 
     print('[Version]', file=opts.timelist)
+    # XXX Technically this should be version 3.  But old clients will simply
+    # ignore the extended file types for restricted directories, and so we can
+    # add this now and let things simmer for a while before bumping the format
+    # and hard-breaking old clients.
     print('2', file=opts.timelist)
     print(file=opts.timelist)
     print('[Files]', file=opts.timelist)
 
     for entry in recursedir(skip=opts.skip_files):
-        # opts.filelist.write(entry.path + '\n')
+        # Ignore everything that's not at least group readable
+        if not (entry.stat(follow_symlinks=False).st_mode & stat.S_IRGRP):
+            print('{} not group readable'.format(entry.path))
+
         print(entry.path, file=opts.filelist)
+
         # write to filtered list if appropriate
         imgs = ['.{0}'.format(form) for form in SUPPORTED_IMAGE_FORMATS]
         if any(entry.path.endswith(img) for img in imgs):
             print(entry.path, file=opts.imagelist)
         if entry.name in opts.checksum_files:
             checksums[entry.path[2:]] = True
+
         info = entry.stat(follow_symlinks=False)
         modtime = max(info.st_mtime, info.st_ctime)
         size = info.st_size
         ftype = get_ftype(entry)
-        # opts.timelist.write('{0}\t{1}\t{2}\n'.format(modtime, ftype, entry.path[2:]))
         print('{0}\t{1}\t{2}\t{3}'.format(modtime, ftype, size, entry.path[2:]), file=opts.timelist)
 
     print('\n[Checksums SHA1]', file=opts.timelist)
