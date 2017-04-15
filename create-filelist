@@ -13,7 +13,12 @@ import hashlib
 import os
 import stat
 import sys
-from scandir import scandir
+
+# Get scandir from whatever module provides it today
+try:
+    from os import scandir
+except ImportError:
+    from scandir import scandir
 
 # productmd is optional, needed only for the imagelist feature
 try:
@@ -22,21 +27,36 @@ except ImportError:
     SUPPORTED_IMAGE_FORMATS = []
 
 
-def get_ftype(entry):
-    """Return a simple indicator of the file type."""
-    if entry.is_symlink():
-        return 'l'
+class SEntry(object):
+    """A simpler DirEntry-like object."""
 
-    # Check world-readability and add a '-' to the file type for things which
-    # have restricted permissions.
-    m = ''
-    if not (entry.stat().st_mode & stat.S_IROTH):
-        # print('{} not world readable'.format(entry.path))
-        m = '-'
+    def __init__(self, direntry, restricted=False):
+        self.direntry = direntry
+        self.restricted = restricted
+        self.path = direntry.path
+        self.name = direntry.name
 
-    if entry.is_dir():
-        return 'd' + m
-    return 'f' + m
+        info = direntry.stat(follow_symlinks=False)
+        self.modtime = max(info.st_mtime, info.st_ctime)
+        self.readable_group = info.st_mode & stat.S_IRGRP
+        self.readable_world = info.st_mode & stat.S_IROTH
+        self.size = info.st_size
+
+        ftype = 'f'
+        perm = ''
+        if direntry.is_symlink():
+            ftype = 'l'
+        elif direntry.is_dir():
+            ftype = 'd'
+
+        if self.restricted:
+            perm = '*'
+
+        # Note that we want an unreadable state to override the restricted state
+        if not self.readable_world:
+            perm = '-'
+
+        self.ftype = ftype + perm
 
 
 def sha1(fname):
@@ -51,32 +71,39 @@ def sha1(fname):
     return sha1.hexdigest()
 
 
-def recursedir(path='.', skip=[], alwaysskip=['.~tmp~']):
-    """Just like scandir, but recursively.
+def recursedir(path='.', skip=[], alwaysskip=['.~tmp~'], in_restricted=False):
+    """Like scandir, but recursively.
 
     Will skip everything in the skip array, but only at the top level
     directory.
+
+    Returns SEntry objects.  If in_restricted is true, all returned entries will
+    be marked as restricted even if their permissions are not restricted.
     """
-    for entry in scandir(path):
-        if entry.name in skip:
+    for de in scandir(path):
+        if de.name in skip:
             continue
-        if entry.name in alwaysskip:
+        if de.name in alwaysskip:
             continue
 
         # Skip things which are not at least group readable
-
         # Symlinks are followed here so that clients won't see dangling
         # symlinks to content they can't transfer.  It's the default, but to
         # avoid confusion it's been made explicit.
-        if not (entry.stat(follow_symlinks=True).st_mode & stat.S_IRGRP):
-            # print('{} is not group readable; skipping.'.format(entry.path))
+        if not (de.stat(follow_symlinks=True).st_mode & stat.S_IRGRP):
+            # print('{} is not group readable; skipping.'.format(de.path))
             continue
 
-        if entry.is_dir(follow_symlinks=False):
+        se = SEntry(de, in_restricted)
+        if de.is_dir(follow_symlinks=False):
+            if not se.readable_world:
+                # print('{} is not world readable; marking as restricted.'.format(se.path), file=sys.stderr)
+                in_restricted = True
+
             # Don't pass skip here, because we only skip in the top level
-            for rentry in recursedir(entry.path, alwaysskip=alwaysskip):
+            for rentry in recursedir(se.path, alwaysskip=alwaysskip, in_restricted=in_restricted):
                 yield rentry
-        yield entry
+        yield se
 
 
 def parseopts():
@@ -143,10 +170,6 @@ def main():
     print('[Files]', file=opts.timelist)
 
     for entry in recursedir(skip=opts.skip_files):
-        # Ignore everything that's not at least group readable
-        if not (entry.stat(follow_symlinks=False).st_mode & stat.S_IRGRP):
-            print('{} not group readable'.format(entry.path))
-
         print(entry.path, file=opts.filelist)
 
         # write to filtered list if appropriate
@@ -156,11 +179,9 @@ def main():
         if entry.name in opts.checksum_files:
             checksums[entry.path[2:]] = True
 
-        info = entry.stat(follow_symlinks=False)
-        modtime = max(info.st_mtime, info.st_ctime)
-        size = info.st_size
-        ftype = get_ftype(entry)
-        print('{0}\t{1}\t{2}\t{3}'.format(modtime, ftype, size, entry.path[2:]), file=opts.timelist)
+        print('{0}\t{1}\t{2}\t{3}'.format(entry.modtime, entry.ftype,
+                                          entry.size, entry.path[2:]),
+              file=opts.timelist)
 
     print('\n[Checksums SHA1]', file=opts.timelist)
 
