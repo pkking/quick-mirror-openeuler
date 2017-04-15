@@ -101,8 +101,8 @@ def recursedir(path='.', skip=[], alwaysskip=['.~tmp~'], in_restricted=False):
                 in_restricted = True
 
             # Don't pass skip here, because we only skip in the top level
-            for rentry in recursedir(se.path, alwaysskip=alwaysskip, in_restricted=in_restricted):
-                yield rentry
+            for re in recursedir(se.path, alwaysskip=alwaysskip, in_restricted=in_restricted):
+                yield re
         yield se
 
 
