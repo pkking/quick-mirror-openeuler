@@ -613,6 +613,67 @@ EOF
     logit M "Processing $module: end"
 }
 
+process_remote_file_lists () {
+    # Extract various file and directory lists from the master file list
+    #
+    # This will also handle ignoring restricted or pre-bitflip content if
+    # necessary.
+    #
+    # Will create the following files:
+    #   allfilesizes-$module
+    #   allfiles-$module
+    #   alldirs-$module
+    #   allprotecteddirs-$module
+
+    local module=$1
+    local moduledir=$2
+
+    db3 Extracting file and directory lists for $module.
+
+    if [[ -n $PREBITFLIP ]]; then
+        # All dirs in the remote repository, including restricted content
+        db4 "Directories (pre-bitflip included)"
+        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+            { if (s && (\$2 == \"d\" || \$2 == \"d-\" || \$2 == \"d*\"))
+                print \"$moduledir/\" \$4}
+                " < $fl > alldirs-$module
+
+        # And the files/links (including restricted), with sizes
+        db4 "Files (pre-bitflip included)"
+        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                     {if (s && (\$2 == \"f\" || \$2 == \"f-\" || \$2 == \"f*\" ||
+                                \$2 == \"l\" || \$2 == \"l-\" || \$2 == \"l*\"
+                               )
+                         )
+                         print \"$moduledir/\" \$4 \"\t\" \$3
+                     }
+                     " $fl > allfilesizes-$module
+
+    else
+        # All dirs, unrestricted only
+        db4 "Directories (pre-bitflip excluded)"
+        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+            { if (s && \$2 == \"d\")
+                print \"$moduledir/\" \$4}
+                " < $fl > alldirs-$module
+
+        # All files/links, with sizes, unrestricted only
+        db4 "Files (pre-bitflip included)"
+        awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
+                     {if (s && (\$2 == \"f\" || \$2 == \"l\"))
+                         print \"$moduledir/\" \$4 \"\t\" \$3
+                     }
+                    " $fl > allfilesizes-$module
+    fi
+
+    # Filter the lists if needed
+    filter allfilesizes-$module
+    filter alldirs-$module
+
+    # Produce the file list.
+    awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module
+}
+
 # Main program execution
 # ======================
 parse_args "$@"
@@ -752,31 +813,7 @@ for module in $MODULES; do
         continue
     fi
 
-    db3 Extracting file and directory lists.
-
-    # All files in the remote repository.
-    # Extract with the sizes and then extract just the file names from that.
-    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
-                 {if (s && \$2 == \"f\" || \$2 == \"l\")
-                        print \"$moduledir/\" \$4 \"\t\" \$3}
-                " $fl > allfilesizes-$module
-
-    # Filter the list if requested.
-    filter allfilesizes-$module
-
-    # Produce the file list.
-    awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module
-
-    # All dirs in the remote repository.
-    # XXX This code is duplicated later, and should be pulled into a separate
-    # function.
-    awk -F '\t' "/\\[Files/ {s=1;next} /^\$/ {s=0;next}
-                 { if (s && \$2 == \"d\")
-                        print \"$moduledir/\" \$4}
-                " < $fl > alldirs-$module
-
-    # Filter the list if requested.
-    filter alldirs-$module
+    process_remote_file_lists $module $moduledir
 
     linecount=$(wc -l < allfiles-$module)
     linecount2=$(wc -l < alldirs-$module)
