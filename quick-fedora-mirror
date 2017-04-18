@@ -931,7 +931,7 @@ for module in $MODULES; do
         cat updatedfiles-$module >> transferlist-$module
 
         # Extract and verify checksums
-        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"\\t$moduledir/\" \$2}" $fl > checksums-$module
+        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"  $moduledir/\" \$2}" $fl > checksums-$module
         pushd $DESTD > /dev/null 2>&1
         sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null \
             | grep -i 'failed$' \
