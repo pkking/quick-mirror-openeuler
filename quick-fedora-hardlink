@@ -30,7 +30,7 @@ import time
 
 
 class g:
-    pass
+    filetypes = ['f']
 
 
 def options_parse():
@@ -50,6 +50,8 @@ def options_parse():
                    help='Print nothing at all to standard output.')
     p.add_argument('-v', '--verbose', action='store_true',
                    help='Print the source and dest of each hardlink created.')
+    p.add_argument('-t', '--tier1', action='store_true',
+                   help='For tier 1 mirrors, also consider pre-bitflip content.')
 
     opts = p.parse_args()
 
@@ -75,6 +77,9 @@ def options_parse():
     opts.check_ctime = True
     if opts.no_ctime:
         opts.check_ctime = False
+
+    if opts.tier1:
+        g.filetypes = ['f', 'f-', 'f*']
 
     return opts
 
@@ -142,7 +147,7 @@ def process_one_filelist(filelist, module, candidates, check_ctime=True, filtere
             if not len(line):
                 break
             fields = line.split('\t')
-            if fields[1] != 'f':
+            if fields[1] not in g.filetypes:
                 continue
             if filterexp and filterexp.search(line):
                 continue
@@ -277,11 +282,13 @@ def process_one_candidate(target, l, skip=False, verbose=False):
 
         # Compare contents
         if files_differ(target, candidate):
-            # debug that the files differ
+            if verbose:
+                uprint('Not linkable: {} and {}\n'.format(target, candidate))
             continue
 
         if skip:
-            uprint('Would hardlink {} and {}\n'.format(target, candidate))
+            if verbose:
+                uprint('Would hardlink {} and {}\n'.format(target, candidate))
             linked += 1
             saved += tstat.st_size
             continue
