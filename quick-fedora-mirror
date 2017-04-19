@@ -348,6 +348,12 @@ parse_args () {
             --dir-times)
                 updatealldirtimes=1
                 ;;
+            --refresh)
+                skipdelete=1
+                skiptimestamp=1
+                skipcheckin=1
+                refreshpattern=$2
+                ;;
             *)
                 (>&2 echo "Unrecognized argument.")
                 exit 1
