@@ -1,0 +1,160 @@
+# Shared functions and setup
+umask 002
+FIXED_CONTENT=abcdefghijklmnopqrstuvwxyz
+FIXED_CSUM=$(echo -n $FIXED_CONTENT | sha1sum | awk '{print $1}')
+
+create_some_files () {
+    # Create a few files and fil them with some data.
+    #  Some files will contain random data; file0 will always contain a-z with
+    #  no newline and should alwys be 26 bytes in size.
+    local dir=$1
+    local count=3
+    local i
+
+    if [[ -n $2 ]]; then
+        count=$2
+    fi
+
+    pushd $dir
+    echo -n $FIXED_CONTENT > file0
+    for i in file{1..$count}; do
+        echo $dir/$i > $i
+        date +%s%N >> $i
+    done
+    popd
+}
+
+create_dir_structure () {
+    local dir=$1
+    local count=3
+    local i
+
+    if [[ -n $2 ]]; then
+        count=$2
+    fi
+
+    mkdir $dir
+    pushd $dir
+    create_some_files .
+
+    for i in dir{1..$count}; do
+        mkdir $i
+        create_some_files $i $count
+    done
+    popd
+}
+
+dirs_similar () {
+    # Do two directories have the same contents?
+    #
+    # run recursive diff
+    local d1=$1
+    local d2=$2
+
+    diff -r $d1 $d2 >> $so 2>$se
+}
+
+dirs_contents_identical () {
+    # Are the files in two directories completely identical, including file
+    # time and permissions?
+    #
+    # run find . -type f -printf '%T@\t%m\t%p\n' for each directory and diff the result.
+    # Might have problems with the fractional part of mtime.
+    local d1=$1
+    local d2=$2
+
+    local c1=$od/contents1
+    local c2=$od/contents2
+
+    find $d1 -type f -printf '%T@\t%m\t%P\n' |sort > $c1
+    find $d2 -type f -printf '%T@\t%m\t%P\n' |sort > $c2
+
+    diff -u $c1 $c2 > $so 2>$se
+
+    # Cat those files for verbose tests
+}
+
+files_contents_identical () {
+    echo foo
+    local f1=$1
+    local f2=$2
+
+    if [[ ! -e $f1 || ! -e $f2 ]]; then
+        return 1
+    fi
+
+    local s1=$(sha1sum $f1 | awk '{print $1}')
+    local s2=$(sha1sum $f2 | awk '{print $1}')
+
+    if [[ $s1 != $s2 ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+files_hardlinked () {
+    # Are two files hardlinked?
+    local f1=$1
+    local f2=$2
+
+    if [[ ! -e $f1 || ! -e $f2 ]]; then
+        return 1
+    fi
+
+    i1=$(stat -c %i $f1)
+    i2=$(stat -c %i $f2)
+
+    if [[ $i1 -ne $i2 ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+file_contains () {
+    local f=$1
+    # Turn TAB into literal tabs
+    local p=${2//TAB/	}
+    shift
+
+    #echo grep -q -P -- "$@" $f
+    #grep -P -q -- "$@" $f
+    echo grep -q -P -- "$p" $f
+    grep -P -- "$p" $f
+}
+
+oneTimeSetUp () {
+    # For this test suite we'll be doing the same setup for everything
+    sd=${SHUNIT_TMPDIR}/scratch
+    od=${SHUNIT_TMPDIR}/output
+    mkdir $od
+
+    so=$od/stdout
+    se=$od/stderr
+
+    td=${SHUNIT_TMPDIR}/tmp
+    tl=$td/fullfiletimelist
+    fl=$td/fullfilelist
+}
+
+
+find-shunit () {
+    local i
+
+    for i in \
+        $SHUNIT \
+        shunit2 \
+        ../shunit2 \
+        ../../shunit2 \
+        /usr/share/shunit2/shunit2 \
+        ; do
+        if [[ -r $i ]]; then
+            echo $i
+            return
+        fi
+    done
+    (>&2 echo "Cannot locate shunit2; exiting")
+    exit 1
+}
+

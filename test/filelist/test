@@ -114,6 +114,8 @@ test_mass_hardlink () {
     mkdir $td/z
     cp -r $td/dir1 $td/dir2 $td/z
     $cf -d $td -t $tl
+    stat $td/dir1/file1
+    stat $td/z/dir1/file1
     local time11=$(awk -F '\t' '/\tdir1\/file1$/ {print $1}' $tl)
     local time12=$(awk -F '\t' '/\tdir2\/file2$/ {print $1}' $tl)
     local time13=$(awk -F '\t' '/\tz\/dir1\/file1$/ {print $1}' $tl)
@@ -123,12 +125,17 @@ test_mass_hardlink () {
     assertEquals 'Copying should not change mtime' $time02 $time12
 
     sleep 1
-    hardlink $td
+    ls -lR $td
+    hardlink -vv $td
+    cmp $td/dir1/file1 $td/z/dir1/file1 && echo "no difference"
+    stat $td/dir1/file1
+    stat $td/z/dir1/file1
     $cf -d $td -t $tl
     local time21=$(awk -F '\t' '/\tdir1\/file1$/ {print $1}' $tl)
     local time22=$(awk -F '\t' '/\tdir2\/file2$/ {print $1}' $tl)
     local time23=$(awk -F '\t' '/\tz\/dir1\/file1$/ {print $1}' $tl)
     local time24=$(awk -F '\t' '/\tz\/dir2\/file2$/ {print $1}' $tl)
+    echo $time11 $time21 $time13 $time23
 
     assertNotEquals 'Hardlinking should change mtime' $time11 $time21
     assertNotEquals 'Hardlinking should change mtime' $time12 $time22
@@ -187,6 +194,7 @@ test_protected_content () {
     chmod 770 $td/dir2/file3
     chmod 750 $td/file2
     chmod 770 $td/dir1/file3
+    $cf -d $td -t $tl
 
     assertTrue 'Restricted dirs must be marked with "-"' \
         "file_contains $tl \"^\d+TABd-TAB\d+TABdir2$\""
