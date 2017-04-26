@@ -80,28 +80,29 @@ def recursedir(path='.', skip=[], alwaysskip=['.~tmp~'], in_restricted=False):
     Returns SEntry objects.  If in_restricted is true, all returned entries will
     be marked as restricted even if their permissions are not restricted.
     """
-    for de in scandir(path):
-        if de.name in skip:
+    for dentry in scandir(path):
+        if dentry.name in skip:
             continue
-        if de.name in alwaysskip:
+        if dentry.name in alwaysskip:
             continue
 
         # Skip things which are not at least group readable
         # Symlinks are followed here so that clients won't see dangling
         # symlinks to content they can't transfer.  It's the default, but to
         # avoid confusion it's been made explicit.
-        if not (de.stat(follow_symlinks=True).st_mode & stat.S_IRGRP):
-            # print('{} is not group readable; skipping.'.format(de.path))
+        if not (dentry.stat(follow_symlinks=True).st_mode & stat.S_IRGRP):
+            # print('{} is not group readable; skipping.'.format(dentry.path))
             continue
 
-        se = SEntry(de, in_restricted)
-        if de.is_dir(follow_symlinks=False):
+        se = SEntry(dentry, in_restricted)
+        if dentry.is_dir(follow_symlinks=False):
+            this_restricted = in_restricted
             if not se.readable_world:
                 # print('{} is not world readable; marking as restricted.'.format(se.path), file=sys.stderr)
-                in_restricted = True
+                this_restricted = True
 
             # Don't pass skip here, because we only skip in the top level
-            for re in recursedir(se.path, alwaysskip=alwaysskip, in_restricted=in_restricted):
+            for re in recursedir(se.path, alwaysskip=alwaysskip, in_restricted=this_restricted):
                 yield re
         yield se
 
@@ -143,11 +144,11 @@ def parseopts():
     opts.skip_files = opts.skip_files or []
     if opts.skip:
         if not opts.timelist.name == '<stdout>':
-            opts.skip_files += [opts.timelist.name]
+            opts.skip_files += [os.path.basename(opts.timelist.name)]
         if not opts.filelist.name == '<stdout>':
-            opts.skip_files += [opts.filelist.name]
+            opts.skip_files += [os.path.basename(opts.filelist.name)]
         if not opts.imagelist.name == '<stdout>':
-            opts.skip_files += [opts.imagelist.name]
+            opts.skip_files += [os.path.basename(opts.imagelist.name)]
 
     return opts
 
