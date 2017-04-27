@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Exercise create-filelist
 cf=${0:h}/../../create-filelist
+qfhardlink=${0:h}/../../quick-fedora-hardlink
 
 test_help () {
     $cf -h &> $so
@@ -101,11 +102,9 @@ test_file_linking () {
 }
 
 test_mass_hardlink () {
-    # See what hardlink does to a tree
-    # We really should just run the hardlinker we supply, but then breakage
-    # there can break this test.
-    type hardlink &> /dev/null
-    [[ $? -eq 0 ]] || startSkipping
+    # Test what hardlinking does to a tree
+    # This ends up exercising the hardlinker as well.  Every little bit of
+    # testing helps....
 
     $cf -d $td -t $tl
     local time01=$(awk -F '\t' '/\tdir1\/file1$/ {print $1}' $tl)
@@ -114,8 +113,7 @@ test_mass_hardlink () {
     mkdir $td/z
     cp -r $td/dir1 $td/dir2 $td/z
     $cf -d $td -t $tl
-    stat $td/dir1/file1
-    stat $td/z/dir1/file1
+
     local time11=$(awk -F '\t' '/\tdir1\/file1$/ {print $1}' $tl)
     local time12=$(awk -F '\t' '/\tdir2\/file2$/ {print $1}' $tl)
     local time13=$(awk -F '\t' '/\tz\/dir1\/file1$/ {print $1}' $tl)
@@ -125,17 +123,21 @@ test_mass_hardlink () {
     assertEquals 'Copying should not change mtime' $time02 $time12
 
     sleep 1
-    ls -lR $td
-    hardlink -vv $td
-    cmp $td/dir1/file1 $td/z/dir1/file1 && echo "no difference"
-    stat $td/dir1/file1
-    stat $td/z/dir1/file1
+
+    cat > $SHUNIT_TMPDIR/hardlink.conf <<END
+DESTD=$tdup
+FILELIST=fullfiletimelist
+END
+
+    #$qfhardlink --debug -v --no-ctime -c $SHUNIT_TMPDIR/hardlink.conf
+    $qfhardlink --no-ctime -c $SHUNIT_TMPDIR/hardlink.conf &> /dev/null
+    #hardlink -vv $tdup
+
     $cf -d $td -t $tl
     local time21=$(awk -F '\t' '/\tdir1\/file1$/ {print $1}' $tl)
     local time22=$(awk -F '\t' '/\tdir2\/file2$/ {print $1}' $tl)
     local time23=$(awk -F '\t' '/\tz\/dir1\/file1$/ {print $1}' $tl)
     local time24=$(awk -F '\t' '/\tz\/dir2\/file2$/ {print $1}' $tl)
-    echo $time11 $time21 $time13 $time23
 
     assertNotEquals 'Hardlinking should change mtime' $time11 $time21
     assertNotEquals 'Hardlinking should change mtime' $time12 $time22
@@ -208,12 +210,13 @@ test_protected_content () {
 }
 
 setUp () {
+    mkdir -p $tdup
     create_dir_structure $td 3
     mkdir $sd
 }
 
 tearDown () {
-    rm -rf $td $sd
+    rm -rf $tdup $sd
     if [[ -n "$TEST_VERBOSE" ]]; then
         if [[ -s $so ]]; then
             echo "Assertion standard output:"

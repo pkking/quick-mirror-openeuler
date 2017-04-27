@@ -1,5 +1,9 @@
 # Shared functions and setup
 umask 002
+
+# Absolute path of the directory containing the test
+testdir=${0:A:h}
+
 FIXED_CONTENT=abcdefghijklmnopqrstuvwxyz
 FIXED_CSUM=$(echo -n $FIXED_CONTENT | sha1sum | awk '{print $1}')
 
@@ -33,7 +37,7 @@ create_dir_structure () {
         count=$2
     fi
 
-    mkdir $dir
+    mkdir -p $dir
     pushd $dir
     create_some_files .
 
@@ -126,14 +130,15 @@ file_contains () {
 
 oneTimeSetUp () {
     # For this test suite we'll be doing the same setup for everything
-    sd=${SHUNIT_TMPDIR}/scratch
-    od=${SHUNIT_TMPDIR}/output
+    sd=$SHUNIT_TMPDIR/scratch
+    od=$SHUNIT_TMPDIR/output
     mkdir $od
 
     so=$od/stdout
     se=$od/stderr
 
-    td=${SHUNIT_TMPDIR}/tmp
+    td=$SHUNIT_TMPDIR/tmp/module
+    tdup=$SHUNIT_TMPDIR/tmp
     tl=$td/fullfiletimelist
     fl=$td/fullfilelist
 }
