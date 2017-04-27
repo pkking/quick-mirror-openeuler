@@ -1,0 +1,12 @@
+#!/bin/zsh
+for i in test/*/test; do
+    if [[ -x $i ]]; then
+        echo "=========="
+        echo "Running: ${i:h:t}"
+        echo "----------"
+        $i
+    else
+        echo "=========="
+        echo "Skipping: ${i:h:t}"
+    fi
+done
