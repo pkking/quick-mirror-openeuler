@@ -1,9 +1,6 @@
 # Shared functions and setup
 umask 002
 
-# Absolute path of the directory containing the test
-testdir=${0:A:h}
-
 FIXED_CONTENT=abcdefghijklmnopqrstuvwxyz
 FIXED_CSUM=$(echo -n $FIXED_CONTENT | sha1sum | awk '{print $1}')
 

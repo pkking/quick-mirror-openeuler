@@ -99,7 +99,7 @@ test_files_contents_identical_2 () {
 }
 
 setUp () {
-    mkdir $td
+    mkdir -p $td
 }
 
 tearDown () {
