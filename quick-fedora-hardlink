@@ -386,7 +386,6 @@ def process_candidates(candidates, skip=False):
         linkedtotal += linked
         alreadylinkedtotal += alreadylinked
         savedtotal += saved
-        count += 1
 
         if count % 25 == 0 or linked != 0:
             # Total (pct) - existing links - new links - saved - time estimate
@@ -400,6 +399,8 @@ def process_candidates(candidates, skip=False):
                            (savedtotal / 1024 ** 3),
                            left)
                    )
+
+        count += 1
 
     return (linkedtotal, savedtotal)
 
