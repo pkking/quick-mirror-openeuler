@@ -1,0 +1,162 @@
+#!/bin/zsh
+# Exercise the hardlinker.  This will also by necessity call the file list
+# generator.
+
+testdir=${0:A:h}
+qfh=${0:A:h}/../../quick-fedora-hardlink
+cf=${0:A:h}/../../create-filelist
+
+test_help () {
+    $qfh -h &> $so
+    assertTrue 'Help text not good' "file_contains $so \"quickly hardlink\""
+    assertTrue 'Help text not good' "file_contains $so --no-ctime"
+}
+
+test_simple () {
+    # Test the simplest hardlinking scenario
+
+    mkdir $td/a $td/b
+    echo foo > $td/a/f
+    sleep 1
+    echo foo > $td/b/f
+    $cf -d $td -t $tl
+
+    pushd $tdup
+
+    assertFalse 'Files linked initially???' \
+        "files_hardlinked $td/a/f $td/b/f"
+
+    $qfh -v --debug -c $testdir/hl.conf &> /dev/null
+    assertFalse 'Files with differing ctimes should not be linked' \
+        "files_hardlinked $td/a/f $td/b/f"
+
+    $qfh -v --debug --no-ctime -c $testdir/hl.conf &> /dev/null
+    assertTrue  '--no-ctime flag should cause identical files to be link regardless of ctime' \
+        "files_hardlinked $td/a/f $td/b/f"
+
+    popd
+}
+
+test_nested_1 () {
+    # Test deep nesting and multiple linkable files
+    # Things are created in differing orders just to make sure that doesn't
+    # matter
+    for i in {d..a}; do
+        mkdir $td/$i
+        for j in {a..d}; do
+            mkdir $td/$i/$j
+            for k in b d c a; do
+                echo foo >> $td/$i/$j/$k
+            done
+        done
+    done
+    $cf -d $td -t $tl
+
+    # All files with the same name should be linkable
+    # Using --no-ctime so we don't have to care about times
+    pushd $tdup
+    $qfh -v --debug --no-ctime -c $testdir/hl.conf &> /dev/null
+    popd
+
+    for i in {a..d}; do
+        for j in {a..d}; do
+            for k in {a..d}; do
+                assertTrue "Should be linked: a/a/$k and $i/$j/$k" "files_hardlinked $td/a/a/$k $td/$i/$j/$k"
+            done
+        done
+    done
+}
+
+test_nested_2 () {
+    # Test deep nesting with identical sizes but differing contents
+    # Should still result in the same links as before
+
+    for i in {a..d}; do
+        mkdir $td/$i
+        for j in {d..a}; do
+            mkdir $td/$i/$j
+            echo "zzzz" > $td/$i/$j/d
+            echo "zzzz" > $td/$i/$j/b
+            echo "aaaa" > $td/$i/$j/a
+            echo "aaaa" > $td/$i/$j/c
+        done
+    done
+    $cf -d $td -t $tl
+
+    pushd $tdup
+    $qfh -v --debug --no-ctime -c $testdir/hl.conf &> /dev/null
+    popd
+
+    for i in {a..d}; do
+        for j in {a..d}; do
+            for k in {a..d}; do
+                assertTrue "Should be linked: a/a/$k and $i/$j/$k" "files_hardlinked $td/a/a/$k $td/$i/$j/$k"
+            done
+        done
+    done
+}
+
+test_nested_3 () {
+    # Deep nesting, identical sizes, differing contents
+    # ?/a/? shoudl link to ?/c/? and ?/b/? should link to ?/d/?
+
+    for i in {a..d}; do
+        mkdir $td/$i
+        for j in {d..a}; do
+            mkdir $td/$i/$j
+            for k in a c d b; do
+                if [[ $j == 'a' || $j == 'c' ]]; then
+                    echo "zzzz" > $td/$i/$j/$k
+                else
+                    echo "aaaa" > $td/$i/$j/$k
+                fi
+            done
+        done
+    done
+    $cf -d $td -t $tl
+
+    pushd $tdup
+    $qfh -v --debug --no-ctime -c $testdir/hl.conf &> /dev/null
+    popd
+
+    for i in {a..d}; do
+        for j in {a..d}; do
+            for k in {a..d}; do
+                if [[ $j == 'a' || $j == 'c' ]]; then
+                    assertTrue "Should be linked: a/a/$k and $i/$j/$k" "files_hardlinked $td/a/a/$k $td/$i/$j/$k"
+                else
+                    assertTrue "Should be linked: a/b/$k and $i/$j/$k" "files_hardlinked $td/a/b/$k $td/$i/$j/$k"
+                fi
+            done
+        done
+    done
+
+}
+
+setUp () {
+    mkdir -p $td
+    mkdir $sd
+}
+
+tearDown () {
+    rm -rf $tdup $sd
+    if [[ -n "$TEST_VERBOSE" ]]; then
+        if [[ -s $so ]]; then
+            echo "Assertion standard output:"
+            cat $so
+        fi
+        if [[ -s $se ]]; then
+            echo "Assertion standard error:"
+            cat $se
+        fi
+    fi
+    rm -f $so $se
+}
+
+# load local functions
+source ${0:h}/../test-setup.zsh
+
+# load shunit2
+SHUNIT_PARENT=$0
+setopt shwordsplit
+. $(find-shunit)
