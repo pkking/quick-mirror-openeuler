@@ -1,0 +1,184 @@
+#!/bin/zsh
+# Exercise quick-fedora-mirror itself
+#
+# This is necessarily the most complicated module, and will end up exercising
+# the other utilities as well.
+
+testdir=${0:A:h}
+qfh=${0:A:h}/../../quick-fedora-hardlink
+cf=${0:A:h}/../../create-filelist
+qfm=${0:A:h}/../../quick-fedora-mirror
+
+test_syntax () {
+    assertTrue 'Syntax problem' "zsh -n $qfm"
+}
+
+# No help output yet, so no point in a function to check that it works
+
+test_simple () {
+    # Just a simple copy
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/simple.conf &> $so" # 2> $se"
+    rm -rf $srcdir/master/module-[bc]
+    assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
+}
+
+test_multiple_modules () {
+    assertTrue 'Multi-module copy did not succeed' \
+        "$qfm -c $testdir/multi.conf &> $so"
+    assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
+}
+
+test_restricted_1 () {
+    # Run with protected content and PREBITFLIP not set; protected things shouldn't be copied
+    chmod 770 $td3/dir3
+    chmod 770 $td3/dir4/dir4
+    chmod 770 $td3/dir5/dir5/file0
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/norestrict.conf &> $so" # 2> $se"
+    for i in dir1 dir1/file0 dir2/dir1 dir2/dir3/file0; do
+        assertTrue "Unrestricted content $i should have been copied" \
+            "[[ -e $destdir/module-c/$i ]]"
+    done
+    for i in dir3 dir3/file0 dir3/dir1 dir3/dir1/file0 dir4/dir4 dir4/dir4/file0 dir5/dir5/file0; do
+        assertFalse "Restricted content $i should not have been copied" \
+            "[[ -e $destdir/module-c/$i ]]"
+    done
+}
+
+test_restricted_2 () {
+    # Run with protected content and PREBITFLIP set; everything should be copied
+    chmod 770 $td3/dir3
+    chmod 770 $td3/dir4/dir4
+    chmod 770 $td3/dir5/dir5/file0
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/restrict.conf &> $so" # 2> $se"
+
+    #ls -R $destdir
+    for i in dir1 dir1/file0 dir2/dir1 dir2/dir3/file0; do
+        assertTrue "Unrestricted content $i should have been copied" \
+            "[[ -e $destdir/module-c/$i ]]"
+    done
+     for i in dir3 dir3/file0 dir3/dir1 dir3/dir1/file0 dir4/dir4 dir4/dir4/file0 dir5/dir5/file0; do
+        assertTrue "Restricted content $i must been copied" \
+            "[[ -e $destdir/module-c/$i ]]"
+    done
+}
+
+test_update () {
+    # Test transfer of changes after an update
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/simple.conf &> $so"
+
+    # Change some content
+    for i in $(find $srcdir -name file0); do
+        echo update >> $i
+    done
+
+    sleep 1
+
+    # Just update some times
+    for i in $(find $srcdir -name file1); do
+        touch $i
+    done
+    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+
+    assertTrue 'A simple update did not succeed' "$qfm -c $testdir/simple.conf &> $so"
+
+    assertTrue 'The content was not copied correctly' \
+        "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
+
+}
+
+test_hardlinks_1 () {
+    # Make sure initially hardlinked content is copied as hardlinks.
+    pushd $srcdir/master
+    assertTrue 'Hardlinking failed' \
+        "$qfh -v --debug --no-ctime -c $testdir/hardlink.conf &> $so"
+    popd
+
+    assertTrue 'The initial copy did not succeed' \
+        "$qfm -c $testdir/simple.conf &> $so"
+
+    # All of the file0s should have been hardlinked
+    for i in $(find $destdir -name file0); do
+        assertTrue "Link was not copied ($i)" \
+            "files_hardlinked $destdir/module-a/file0 $i"
+
+    done
+}
+
+test_hardlinks_2 () {
+    # Copy, then hardlink, update the file lists and copy again.
+    assertTrue 'The initial copy did not succeed' \
+        "$qfm -c $testdir/simple.conf &> $so"
+
+    for i in $(find $destdir -name file0 | grep -v module-a/file0); do
+        assertFalse "Should not be linked ($i)" \
+            "files_hardlinked $destdir/module-a/file0 $i"
+    done
+
+    pushd $srcdir/master
+    assertTrue 'Hardlinking failed' \
+        "$qfh -v --no-ctime -c $testdir/hardlink.conf &> $so"
+    popd
+    assertTrue 'create-filelist failed' \
+        "$cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a"
+
+    assertTrue 'The update did not succeed' \
+        "$qfm -c $testdir/simple.conf &> $so"
+
+    # All of the file0s should now be hardlinked
+    for i in $(find $destdir -name file0); do
+        assertTrue "Link was not copied ($i)" \
+            "files_hardlinked $destdir/module-a/file0 $i"
+    done
+}
+
+setUp () {
+    # Make three different modules, each with different levels of nesting.
+    td1="$master/module-a"
+    fl1=$td1/fullfiletimelist-module-a
+    td2="$master/module-b"
+    fl2=$td2/fullfiletimelist-module-b
+    td3="$master/module-c"
+    fl3=$td3/fullfiletimelist-module-c
+
+    mkdir -p $mdir/tmp $srcdir $master $td1 $td2 $td3 $destdir
+
+    create_dir_structure $td1 2 7
+    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+
+    create_dir_structure $td2 3 4
+    $cf -d $td2 -f $td2/fullfilelist -t $td2/fullfiletimelist-module-b
+
+    create_dir_structure $td3 5 3
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    mkdir $sd
+    touch $mdir/qfm.log
+    export TESTD=$mdir
+}
+
+tearDown () {
+    rm -rf $tdup $sd
+    if [[ -n "$TEST_VERBOSE" ]]; then
+        if [[ -s $so ]]; then
+            echo "Assertion standard output:"
+            cat $so
+        fi
+        if [[ -s $se ]]; then
+            echo "Assertion standard error:"
+            cat $se
+        fi
+    fi
+    rm -rf $so $se $mdir
+}
+
+# load local functions
+source ${0:h}/../test-setup.zsh
+
+# load shunit2
+SHUNIT_PARENT=$0
+setopt shwordsplit
+. $(find-shunit)

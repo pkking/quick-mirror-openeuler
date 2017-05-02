@@ -25,23 +25,33 @@ create_some_files () {
     popd
 }
 
+
 create_dir_structure () {
     local dir=$1
     local count=3
+    local nest=2
     local i
 
     if [[ -n $2 ]]; then
         count=$2
     fi
 
+    if [[ -n $3 ]]; then
+        nest=$3
+    fi
+
     mkdir -p $dir
     pushd $dir
     create_some_files .
 
-    for i in dir{1..$count}; do
-        mkdir $i
-        create_some_files $i $count
-    done
+    if (( nest > 1 )); then
+        nest=$(( nest -1 ))
+        for i in dir{1..$count}; do
+            create_dir_structure $i $count $nest
+            #mkdir $i
+            #create_some_files $i $count
+        done
+    fi
     popd
 }
 
@@ -67,8 +77,8 @@ dirs_contents_identical () {
     local c1=$od/contents1
     local c2=$od/contents2
 
-    find $d1 -type f -printf '%T@\t%m\t%P\n' |sort > $c1
-    find $d2 -type f -printf '%T@\t%m\t%P\n' |sort > $c2
+    find $d1 -type f -printf '%T@\t%m\t%P\n' |sort -k3 > $c1
+    find $d2 -type f -printf '%T@\t%m\t%P\n' |sort -k3 > $c2
 
     diff -u $c1 $c2 > $so 2>$se
 
@@ -88,6 +98,9 @@ files_contents_identical () {
     local s2=$(sha1sum $f2 | awk '{print $1}')
 
     if [[ $s1 != $s2 ]]; then
+        echo "Checksums:" >> $so
+        echo $s1 >> $so
+        echo $s2 >> $so
         return 1
     fi
 
@@ -107,6 +120,9 @@ files_hardlinked () {
     i2=$(stat -c %i $f2)
 
     if [[ $i1 -ne $i2 ]]; then
+        echo "Inodes:"
+        echo $i1 >> $so
+        echo $i1 >> $so
         return 1
     fi
 
@@ -134,8 +150,13 @@ oneTimeSetUp () {
     so=$od/stdout
     se=$od/stderr
 
-    td=$SHUNIT_TMPDIR/tmp/module
-    tdup=$SHUNIT_TMPDIR/tmp
+    tdup=$SHUNIT_TMPDIR/top
+    td=$tdup/sub
+
+    mdir=$SHUNIT_TMPDIR/mirror
+    srcdir=$mdir/src
+    destdir=$mdir/dest
+    master=$srcdir/master
     tl=$td/fullfiletimelist
     fl=$td/fullfilelist
 }
