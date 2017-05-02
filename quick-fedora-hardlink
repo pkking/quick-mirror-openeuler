@@ -86,16 +86,16 @@ def options_parse():
     return opts
 
 
-def uprint(string, nl=False):
+def uprint(string, nl=False, fh=sys.stdout):
     """Unbuffered print without advancing the cursor.
 
-    Writes to stderr, prefixing with \r and clearing the rest of the line.
-    Pass nl=True if you want to advance the line.
+    Writes to fh (default is stdout), prefixing with \r and clearing the rest of
+    the line.  Pass nl=True if you want to advance the line.
     """
-    sys.stderr.write('\r' + string + '\x1b[0K')
+    fh.write('\r' + string + '\x1b[0K')
     if nl:
-        sys.stderr.write('\n')
-    sys.stderr.flush()
+        fh.write('\n')
+    fh.flush()
 
 
 def config_read(opts):
@@ -287,7 +287,7 @@ def process_one_tuple(l, skip=False):
             tstat = os.stat(target)
         except os.error:
             if g.opts.verbose:
-                uprint('Could not find {}.  File list out of date?\n'.format(target))
+                uprint('Could not find {}.  File list out of date?\n'.format(target), fh=sys.stderr)
             continue
 
         for candidate in l:
@@ -301,7 +301,7 @@ def process_one_tuple(l, skip=False):
                 cstat = os.stat(candidate)
             except os.error:
                 if g.opts.verbose:
-                    uprint('Could not find {}.  File list out of date?\n'.format(candidate))
+                    uprint('Could not find {}.  File list out of date?\n'.format(candidate), fh=sys.stderr)
                 continue
 
             # Compare inode
