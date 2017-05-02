@@ -15,8 +15,12 @@ TIMEFILE=
 # REMOTE=rsync://dl.fedoraproject.org
 
 # The master module, which holds the other modules
-# Tier 1 mirrors should change this to fedora-buffet0
 # MASTERMODULE=fedora-buffet
+
+# Tier 1 Fedora mirrors should uncomment the following to get the proper
+# pre-bitflip content.
+# MASTERMODULE=fedora-buffet0
+# PREBITFLIP=1
 
 # Define if the entire repository (all modules under fedora-buffet) should be
 # mirrored.  If set, MODULES (below) is ignored
