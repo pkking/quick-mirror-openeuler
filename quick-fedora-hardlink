@@ -195,7 +195,9 @@ def generate_candidates(filelist='fullfiletimelist-$mdir', check_ctime=True, fil
         if not os.path.isfile(fl):
             continue
 
-        print('  {}'.format(fl))
+        if not g.opts.quiet and not g.opts.silent:
+            print('  {}'.format(fl))
+
         process_one_filelist(fl, module, candidates, check_ctime=check_ctime, filterexp=filterexp)
 
     return candidates
@@ -387,7 +389,7 @@ def process_candidates(candidates, skip=False):
         alreadylinkedtotal += alreadylinked
         savedtotal += saved
 
-        if count % 25 == 0 or linked != 0:
+        if count % 25 == 0 or linked != 0 and not g.opts.quiet and not g.opts.silent:
             # Total (pct) - existing links - new links - saved - time estimate
             uprint('{:7} tuples ({:2.2%})'
                    ' - links: ({} exist, {} new)'
@@ -411,7 +413,8 @@ def main():
     config_check(opts)
     os.chdir(opts.destd)
     timestart = time.time()
-    print('Processing file lists in {}:'.format(opts.destd))
+    if not opts.silent:
+        print('Processing file lists in {}:'.format(opts.destd))
     c = generate_candidates(filelist=opts.filelist, check_ctime=opts.check_ctime, filterexp=opts.filterexp)
     trim_candidates(c)
     if opts.debug:
@@ -419,20 +422,23 @@ def main():
         for k in c:
             print("  {}: {}".format(k, c[k]))
 
-    print()
-    print('Found {} tuples of potentially hardlinkable files in {:.1f} minutes.'
-          .format(len(c), (time.time() - timestart) / 60))
-    print()
+    if not opts.quiet and not opts.silent:
+        print()
+        print('Found {} tuples of potentially hardlinkable files in {:.1f} minutes.'
+              .format(len(c), (time.time() - timestart) / 60))
+        print()
     timestart = time.time()
     (linked, saved) = process_candidates(c, skip=opts.dry_run)
     elapsed = (time.time() - timestart) / 60
-    print('\n')
-    print('Files linked: {}'.format(linked))
-    print('Space saved:  {:.2f}GB'.format(saved / 1024 ** 3))
-    if elapsed < 60:
-        print('Linking took: {:.1f} minutes'.format(elapsed))
-    else:
-        print('Linking took: {:.1f} hours'.format(elapsed / 60))
+
+    if not opts.silent:
+        print('\n')
+        print('Files linked: {}'.format(linked))
+        print('Space saved:  {:.2f}GB'.format(saved / 1024 ** 3))
+        if elapsed < 60:
+            print('Linking took: {:.1f} minutes'.format(elapsed))
+        else:
+            print('Linking took: {:.1f} hours'.format(elapsed / 60))
 
 
 if __name__ == '__main__':
