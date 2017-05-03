@@ -389,7 +389,7 @@ def process_candidates(candidates, skip=False):
         alreadylinkedtotal += alreadylinked
         savedtotal += saved
 
-        if count % 25 == 0 or linked != 0 and not g.opts.quiet and not g.opts.silent:
+        if (count % 25 == 0 or linked != 0) and not g.opts.quiet and not g.opts.silent:
             # Total (pct) - existing links - new links - saved - time estimate
             uprint('{:7} tuples ({:2.2%})'
                    ' - links: ({} exist, {} new)'
@@ -413,7 +413,7 @@ def main():
     config_check(opts)
     os.chdir(opts.destd)
     timestart = time.time()
-    if not opts.silent:
+    if not opts.quiet and not opts.silent:
         print('Processing file lists in {}:'.format(opts.destd))
     c = generate_candidates(filelist=opts.filelist, check_ctime=opts.check_ctime, filterexp=opts.filterexp)
     trim_candidates(c)
@@ -431,8 +431,11 @@ def main():
     (linked, saved) = process_candidates(c, skip=opts.dry_run)
     elapsed = (time.time() - timestart) / 60
 
-    if not opts.silent:
+    # Some space after the progress output
+    if not opts.quiet and not opts.silent:
         print('\n')
+
+    if not opts.silent:
         print('Files linked: {}'.format(linked))
         print('Space saved:  {:.2f}GB'.format(saved / 1024 ** 3))
         if elapsed < 60:
