@@ -288,7 +288,7 @@ def process_one_tuple(l, skip=False):
         try:
             tstat = os.stat(target)
         except os.error:
-            if g.opts.verbose:
+            if not g.opts.silent:
                 uprint('Could not find {}.  File list out of date?\n'.format(target), fh=sys.stderr)
             continue
 
@@ -302,7 +302,7 @@ def process_one_tuple(l, skip=False):
             try:
                 cstat = os.stat(candidate)
             except os.error:
-                if g.opts.verbose:
+                if not g.opts.silent:
                     uprint('Could not find {}.  File list out of date?\n'.format(candidate), fh=sys.stderr)
                 continue
 
