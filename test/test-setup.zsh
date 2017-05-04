@@ -16,13 +16,12 @@ create_some_files () {
         count=$2
     fi
 
-    pushd $dir
+    mkdir -p $dir
     echo -n $FIXED_CONTENT > file0
-    for i in file{1..$count}; do
-        echo $dir/$i > $i
+    for i in $dir/file{1..$count}; do
+        echo $i > $i
         date +%s%N >> $i
     done
-    popd
 }
 
 
@@ -86,7 +85,6 @@ dirs_contents_identical () {
 }
 
 files_contents_identical () {
-    echo foo
     local f1=$1
     local f2=$2
 
@@ -135,9 +133,6 @@ file_contains () {
     local p=${2//TAB/	}
     shift
 
-    #echo grep -q -P -- "$@" $f
-    #grep -P -q -- "$@" $f
-    echo grep -q -P -- "$p" $f
     grep -P -- "$p" $f
 }
 
