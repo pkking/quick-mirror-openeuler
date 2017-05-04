@@ -296,8 +296,8 @@ do_rsync () {
         elif (( rr == 5 || rr == 10 || rr == 23 || rr == 30 || rr == 35 )); then
             # First see if we've already tried too many times
             if (( runcount >= MAXRETRIES )); then
-                logit E rsync from $REMOTE/$module failed
-                (>&2 echo "Could not sync from $REMOTE/$module")
+                logit E rsync from $REMOTE failed
+                (>&2 echo "Could not sync from $REMOTE")
                 [[ -f $errlog ]] && (>&2 cat $errlog)
                 return $rr
             fi
