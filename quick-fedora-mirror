@@ -448,7 +448,7 @@ set_default_vars () {
     CHECKIN_HOST=$(hostname)
     CURL=/usr/bin/curl
     FILELIST='fullfiletimelist-$mdir'
-    FFILELIST='fullfilelist'
+    EXTRAFILES=(fullfilelist imagelist-\$mdir)
     MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
     REMOTE=rsync://dl.fedoraproject.org
     RSYNC=/usr/bin/rsync
@@ -821,13 +821,10 @@ process_module () {
     local moduledir=$MODULEMAPPING[$module]
 
     local fl=${FILELIST/'$mdir'/$moduledir}
-    local ffl=${FFILELIST/'$mdir'/$moduledir}
     local totallines=0
     local linecount linecount2
+    local extra
 
-    # First fetch each filefiletimelist, and make one big transfer list from
-    # all of them.  Copy in the old file from our repo to speed up rsync in case
-    # most of it didn't change
     if [[ -z $alwayscheck && \
             -n $checksums[$module] && \
             $(sha1sum $fl | cut -d' ' -f1) == $checksums[$module] ]]; then
@@ -859,10 +856,12 @@ process_module () {
     linecount2=$(wc -l < newdirs-$module)
     db2f "New on server:         %7d files, %4d dirs.\n" $linecount $linecount2
 
-    # XXX Add the imagelist here
-    # XXX The set of things to add should be a config setting
+    # Add extra files to the transfer list
     echo $moduledir/$fl >> newfiles-$module
-    echo $moduledir/$ffl >> newfiles-$module
+    for extra in $EXTRAFILES; do
+        extra=${extra/'$mdir'/$moduledir}
+        echo $moduledir/$extra >> newfiles-$module
+    done
     cat newfiles-$module >> transferlist-$module
     cat newdirs-$module >> transferlist-$module
     totallines=$((totallines+linecount+linecount2+1))
