@@ -24,7 +24,6 @@ create_some_files () {
     done
 }
 
-
 create_dir_structure () {
     local dir=$1
     local count=3
@@ -156,7 +155,6 @@ oneTimeSetUp () {
     fl=$td/fullfilelist
 }
 
-
 find-shunit () {
     local i
 
@@ -175,4 +173,3 @@ find-shunit () {
     (>&2 echo "Cannot locate shunit2; exiting")
     exit 1
 }
-
