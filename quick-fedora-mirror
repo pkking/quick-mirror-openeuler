@@ -788,7 +788,7 @@ process_remote_file_list () {
         db4 "Files (pre-bitflip excluded)"
         awk_extract_newer_files_no_restricted $fl allfilesizes-$module $moduledir
 
-        db4 "New files (pre-bitflip included)"
+        db4 "New files (pre-bitflip excluded)"
         awk_extract_newer_files_no_restricted $fl newfilesizes-$module $moduledir $LASTTIME
     fi
 
