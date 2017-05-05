@@ -1246,6 +1246,8 @@ if [[ -n $KEEPDIRTIMES && -s master-updatetimestamps ]]; then
 fi
 
 # State saving
+# XXX Doing the mv here actually undoes the locking.  Try to think of a better
+# way to do this.
 # ============
 if [[ -z $skiptimestamp ]]; then
     db2 Saving mirror time to $TIMEFILE
