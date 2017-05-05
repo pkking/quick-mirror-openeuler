@@ -18,6 +18,7 @@ test_syntax () {
 test_simple () {
     # Just a simple copy
     assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/simple.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
     rm -rf $srcdir/master/module-[bc]
     assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
 }
@@ -25,6 +26,7 @@ test_simple () {
 test_multiple_modules () {
     assertTrue 'Multi-module copy did not succeed' \
         "$qfm -c $testdir/multi.conf &> $so"
+    assertFalse 'Errors present in log (2)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
     assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
 }
 
@@ -36,6 +38,7 @@ test_restricted_1 () {
     $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
 
     assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/norestrict.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (3)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
     for i in dir1 dir1/file0 dir2/dir1 dir2/dir3/file0; do
         assertTrue "Unrestricted content $i should have been copied" \
             "[[ -e $destdir/module-c/$i ]]"
@@ -54,6 +57,7 @@ test_restricted_2 () {
     $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
 
     assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/restrict.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (4)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
 
     #ls -R $destdir
     for i in dir1 dir1/file0 dir2/dir1 dir2/dir3/file0; do
@@ -69,6 +73,7 @@ test_restricted_2 () {
 test_update () {
     # Test transfer of changes after an update
     assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (5)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
 
     # Change some content
     for i in $(find $srcdir -name file0); do
@@ -84,6 +89,7 @@ test_update () {
     $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
 
     assertTrue 'A simple update did not succeed' "$qfm -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (6)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
 
     assertTrue 'The content was not copied correctly' \
         "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
@@ -99,6 +105,7 @@ test_hardlinks_1 () {
 
     assertTrue 'The initial copy did not succeed' \
         "$qfm -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (7)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
 
     # All of the file0s should have been hardlinked
     for i in $(find $destdir -name file0); do
@@ -127,12 +134,25 @@ test_hardlinks_2 () {
 
     assertTrue 'The update did not succeed' \
         "$qfm -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (8)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
 
     # All of the file0s should now be hardlinked
     for i in $(find $destdir -name file0); do
         assertTrue "Link was not copied ($i)" \
             "files_hardlinked $destdir/module-a/file0 $i"
     done
+}
+
+test_extrafiles_1 () {
+    # XXX
+    # Need to make sure that fillfiletimelist and imagelist-foo are transferred properly even though they aren't in the file list.
+
+}
+
+test_extrafiles_2 () {
+    # XXX
+    # Also can set an extra file to transfer in the config and make sure that works
+
 }
 
 setUp () {
@@ -147,13 +167,16 @@ setUp () {
     mkdir -p $mdir/tmp $srcdir $master $td1 $td2 $td3 $destdir
 
     create_dir_structure $td1 2 7
-    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a #-i $td1/imagelist-module-a
+    touch $td1/imagelist-module-a
 
     create_dir_structure $td2 3 4
-    $cf -d $td2 -f $td2/fullfilelist -t $td2/fullfiletimelist-module-b
+    $cf -d $td2 -f $td2/fullfilelist -t $td2/fullfiletimelist-module-b #-i $td1/imagelist-module-b
+    touch $td2/imagelist-module-b
 
     create_dir_structure $td3 5 3
-    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c #-i $td1/imagelist-module-c
+    touch $td3/imagelist-module-c
 
     mkdir $sd
     touch $mdir/qfm.log
