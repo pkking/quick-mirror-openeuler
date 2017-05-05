@@ -541,38 +541,15 @@ fetch_file_lists () {
     logit o Remote file list download: end
 }
 
-checkin_module () {
-    # Perform the mirrormanager checkin for a particular module
+checkin_build_inner_payload () {
+    # Build the inner json payload
+    # Takes the module name and the name of the output file to use
     local module=$1
+    local mm=$2
 
-    local mm=mirrormanager-payload-$module
-    local mx=mirrormanager-xmlrpc-$module
     local moduledir=$MODULEMAPPING[$module]
-    local mmcheckin=$MIRRORMANAGERMAPPING[$module]
 
-    if [[ ! -f alldirs-$module ]]; then
-        # We were asked to check in a module that we hadn't previously
-        # processed, which should not happen.
-        logit E "Cannot perform checkin for $module; no directory list exists."
-        return
-    fi
 
-    # Determine the "mirrormanager hostname" to use for this checkin.
-    # Different modules can be set up under different "hosts" in mirrormanager,
-    # even though these might all be on the same machine.  This works around
-    # problems mirrormanager has when crawling machines which mirror
-    # everything.
-    # ZSHISM: This uses "(P)"; the equivalent in bash is "!".
-    local checkinhost=$CHECKIN_HOST
-    local hostspecificvar=CHECKIN_HOST_${module//-/_}
-    if [[ -n ${(P)hostspecificvar} ]]; then
-        checkinhost=${(P)hostspecificvar}
-    fi
-
-    db3 "Performing mirrormanager checkin for $module (in $moduledir) as $checkinhost"
-    logit M "Processing $module (in $moduledir) as $checkinhost"
-
-    # First construct the checkin payload
     cat >$mm <<EOF
 {
     "$mmcheckin": {
@@ -611,6 +588,41 @@ EOF
     "version": 0
 }
 EOF
+}
+
+checkin_module () {
+    # Perform the mirrormanager checkin for a particular module
+    local module=$1
+
+    local mm=mirrormanager-payload-$module
+    local mx=mirrormanager-xmlrpc-$module
+    local moduledir=$MODULEMAPPING[$module]
+    local mmcheckin=$MIRRORMANAGERMAPPING[$module]
+
+    if [[ ! -f alldirs-$module ]]; then
+        # We were asked to check in a module that we hadn't previously
+        # processed, which should not happen.
+        logit E "Cannot perform checkin for $module; no directory list exists."
+        return
+    fi
+
+    # Determine the "mirrormanager hostname" to use for this checkin.
+    # Different modules can be set up under different "hosts" in mirrormanager,
+    # even though these might all be on the same machine.  This works around
+    # problems mirrormanager has when crawling machines which mirror
+    # everything.
+    # ZSHISM: This uses "(P)"; the equivalent in bash is "!".
+    local checkinhost=$CHECKIN_HOST
+    local hostspecificvar=CHECKIN_HOST_${module//-/_}
+    if [[ -n ${(P)hostspecificvar} ]]; then
+        checkinhost=${(P)hostspecificvar}
+    fi
+
+    db3 "Performing mirrormanager checkin for $module (in $moduledir) as $checkinhost"
+    logit M "Processing $module (in $moduledir) as $checkinhost"
+
+    # First construct the checkin payload
+    checkin_build_inner_payload $module $mm
 
     # The xmlrpc endpoint requires that the payload be bzip2 compressed
     bzip2 $mm
