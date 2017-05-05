@@ -144,15 +144,32 @@ test_hardlinks_2 () {
 }
 
 test_extrafiles_1 () {
-    # XXX
-    # Need to make sure that fillfiletimelist and imagelist-foo are transferred properly even though they aren't in the file list.
-
+    # Need to make sure that fillfiletimelist and imagelist-foo are transferred
+    # properly even though they aren't in the file list.
+    assertTrue 'The initial copy did not succeed' \
+        "$qfm -c $testdir/simple.conf &> $so"
+    assertTrue 'imagelist was not copied' "[[ -f $destdir/module-a/imagelist-module-a ]]"
 }
 
 test_extrafiles_2 () {
-    # XXX
-    # Also can set an extra file to transfer in the config and make sure that works
+    # Try with no extra files configured
+    assertTrue 'The initial copy did not succeed' \
+        "$qfm -c $testdir/noextrafiles.conf &> $so"
+    assertFalse 'extra file should not be copied (1)' "[[ -f $destdir/module-a/fullfilelist ]]"
+    assertFalse 'extra file should not be copied (2)' "[[ -f $destdir/module-a/imagelist-module-a ]]"
+}
 
+test_extrafiles_3 () {
+    # Add our own file and see if it's copied
+    EF=(extrafile1 extrafile2-module-a)
+    for i in $EF; do touch $td1/$i; done
+    assertTrue 'create-filelist failed' \
+        "$cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a"
+    assertTrue 'The initial copy did not succeed' \
+        "$qfm -c $testdir/extrafiles.conf &> $so"
+    for i in EF; do
+        assertFalse 'extra file was not copied ($i)' "[[ -f $destdir/module-a/$i ]]"
+    done
 }
 
 setUp () {
@@ -167,15 +184,15 @@ setUp () {
     mkdir -p $mdir/tmp $srcdir $master $td1 $td2 $td3 $destdir
 
     create_dir_structure $td1 2 7
-    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a #-i $td1/imagelist-module-a
+    $cf -d $td1 -s -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a #-i $td1/imagelist-module-a
     touch $td1/imagelist-module-a
 
     create_dir_structure $td2 3 4
-    $cf -d $td2 -f $td2/fullfilelist -t $td2/fullfiletimelist-module-b #-i $td1/imagelist-module-b
+    $cf -d $td2 -s -f $td2/fullfilelist -t $td2/fullfiletimelist-module-b #-i $td1/imagelist-module-b
     touch $td2/imagelist-module-b
 
     create_dir_structure $td3 5 3
-    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c #-i $td1/imagelist-module-c
+    $cf -d $td3 -s -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c #-i $td1/imagelist-module-c
     touch $td3/imagelist-module-c
 
     mkdir $sd
