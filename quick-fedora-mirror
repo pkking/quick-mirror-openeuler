@@ -54,14 +54,14 @@ logit () {
     local item=$1
     shift
     local err=''
-    [[ $item == 'E' ]] && err='ERR: '
-    [[ $item == 'e' ]] && err='Err: '
+    [[ $item == 'E' ]] && err='ERR:'
+    [[ $item == 'e' ]] && err='Err:'
 
     if [[ $LOGITEMS =~ $item || $LOGITEMS =~ '@' ]]; then
-       logwrite $e $*
+       logwrite $err $*
    fi
    if (( VERBOSE >= 3 )); then
-       db3 Log: $e $*
+       db3 Log: $err $*
    fi
 }
 
