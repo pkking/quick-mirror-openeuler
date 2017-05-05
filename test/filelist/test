@@ -209,6 +209,13 @@ test_protected_content () {
     assertTrue 'Unrestricted content must not be marked' "file_contains $tl \"^\d+TABfTAB\d+TABfile0$\""
 }
 
+test_dangling_symlink () {
+    # Make sure we properly handle dangling symlinks
+    ln -s $td/foo $td/foo2
+    assertTrue 'File list creation did not succeed' "$cf -d $td -t $tl >$so 2>$se"
+    assertTrue 'Should complain about dangling symlink' "file_contains $se \"Could not stat\""
+}
+
 setUp () {
     mkdir -p $tdup
     create_dir_structure $td 3
