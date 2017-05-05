@@ -37,6 +37,8 @@ TIMEFILE=
 # An array of extra file lists to be transferred.  They won't be processed, but
 # will implicitly be included in every transfer because file lists can't be
 # included in the file lists.  '$mdir' is substituted as above.
+# Note that if you change this, you will want to do a run with -a to pick up
+# those extra files even in unchanged modules.
 # EXTRAFILES=(fullfilelist imagelist-\$mdir)
 
 # Mapping of MODULES to directory names, as an associative array
