@@ -214,6 +214,8 @@ test_dangling_symlink () {
     ln -s $td/foo $td/foo2
     assertTrue 'File list creation did not succeed' "$cf -d $td -t $tl >$so 2>$se"
     assertTrue 'Should complain about dangling symlink' "file_contains $se \"Could not stat\""
+    assertFalse 'File list should not contain mention of dangling symlink' \
+        "file_contains $tl foo"
 }
 
 setUp () {
