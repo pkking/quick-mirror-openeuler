@@ -422,6 +422,8 @@ set_default_vars () {
     # ZSHISM (initialize associative array)
     typeset -g -A MODULEMAPPING
     typeset -g -A MIRRORMANAGERMAPPING
+    typeset -g -A MIRRORMANAGERMODULEMAPPING
+
     MODULEMAPPING=(
     fedora-alt          alt
     fedora-archive      archive
@@ -437,6 +439,11 @@ set_default_vars () {
     fedora-epel         'fedora epel'
     fedora-secondary    'fedora secondary arches'
     )
+
+    # Mirrormanager has a weird prefix for "fedora-enchilada", so copy the
+    # existing module mapping and alter it
+    MIRRORMANAGERMODULEMAPPING=(${(kv)MODULEMAPPING})
+    MIRRORMANAGERMODULEMAPPING[fedora-enchilada]="fedora/linux"
 
     # Default arguments; override in quick-fedora-mirror.conf
     VERBOSE=0
@@ -547,8 +554,7 @@ checkin_build_inner_payload () {
     local module=$1
     local mm=$2
 
-    local moduledir=$MODULEMAPPING[$module]
-
+    local moduledir=$MIRRORMANAGERMODULEMAPPING[$module]
 
     cat >$mm <<EOF
 {
