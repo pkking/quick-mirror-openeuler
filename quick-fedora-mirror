@@ -1332,17 +1332,15 @@ fi
 # So for each module we mirrored, the filtered file list is correct.  This
 # means that the alldirs-$module file is accurate and we can simply report its
 # contents to mirrormanager.
-if [[ -z $CHECKIN_SITE || -n $skipcheckin ]]; then
-    finish
+if [[ -n $skipcheckin ]]; then
+    db2 Performing mirrormanager checkin
+    logit m "mirrormanager checkin start"
+
+    # Check in just the changed modules
+    for module in $changed_modules; do
+        checkin_module $module
+    done
+
+    logit m "mirrormanager checkin end"
 fi
-
-db2 Performing mirrormanager checkin
-logit m "mirrormanager checkin start"
-
-# Check in just the changed modules
-for module in $changed_modules; do
-    checkin_module $module
-done
-
-logit m "mirrormanager checkin end"
 finish
