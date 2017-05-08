@@ -374,6 +374,12 @@ parse_args () {
                 skiptimestamp=1
                 skipcheckin=1
                 refreshpattern=$2
+                shift
+                ;;
+            --dump-mm-checkin)
+                # Just for the test suite; dump the raw payload to the given file
+                dumpmmcheckin=$2
+                shift
                 ;;
             *)
                 (>&2 echo "Unrecognized argument.")
