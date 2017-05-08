@@ -553,8 +553,10 @@ checkin_build_inner_payload () {
     # Takes the module name and the name of the output file to use
     local module=$1
     local mm=$2
+    local checkinhost=$3
 
     local moduledir=$MIRRORMANAGERMODULEMAPPING[$module]
+    local mmcheckin=$MIRRORMANAGERMAPPING[$module]
 
     cat >$mm <<EOF
 {
@@ -596,6 +598,83 @@ EOF
 EOF
 }
 
+checkin_encode_inner_payload () {
+    # Compress and encode the inner payload.
+    # Takes the input and output filenames
+
+    local in=$1
+    local out=$2
+
+    # The xmlrpc endpoint requires that the payload be bzip2 compressed
+    bzip2 $mm
+
+    # base64 encode
+    base64 --wrap=0 $in.bz2 > $in.bz2.b64
+
+    # change '+' to '-'  and '/' to '_'
+    tr '+/' '-_' < $in.bz2.b64 > $out
+
+    rm $in.bz2 $in.bz2.b64
+}
+
+checkin_build_outer_payload () {
+    # Wrap the encoded payload in just the right xml
+    # Takes input and output filenames
+
+    local in=$1
+    local out=$2
+
+    cat >>$out <<EOF
+<?xml version='1.0'?>
+<methodCall>
+<methodName>checkin</methodName>
+<params>
+<param>
+EOF
+    echo -n "<value><string>" >>$out
+
+    cat <$in >>$out
+
+    cat >>$out <<EOF
+</string></value>
+</param>
+</params>
+</methodCall>
+EOF
+}
+
+checkin_upload_payload () {
+    # Now actually upload the payload
+    # We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
+    local payload=$1
+    local module=$2
+
+    logit M "Making xmlrpc call for $module"
+    local curlopts=(--silent)
+    (( VERBOSE >= 4 )) && curlopts=(--verbose)
+    $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
+    local curlret=$?
+    if [[ $curlret -ne 0 ]]; then
+        logit E "Checkin failure: curl returned $curlret"
+        (>&2 echo "Checkin failure: curl returned $curlret")
+        return 2
+    fi
+
+    # Parse the output to see if we got any useful return
+    # The sed call attempts to strip xml tags.  Easily fooled but we don't expect
+    # any complicated return from mirrormanager.
+    sed -e 's/<[^>]*>//g' curl.out > curl.noxml
+    grep -q -i successful curl.noxml
+
+    if [[ $? -ne 0 ]]; then
+        db1 "Mirrormanager checkin for $module did not appear to succeed."
+        logit E "Doesn't look like we got a good return from mirrormanager."
+        logit E $(cat curl.noxml)
+        return 1
+    fi
+    return 0
+}
+
 checkin_module () {
     # Perform the mirrormanager checkin for a particular module
     local module=$1
@@ -603,7 +682,6 @@ checkin_module () {
     local mm=mirrormanager-payload-$module
     local mx=mirrormanager-xmlrpc-$module
     local moduledir=$MODULEMAPPING[$module]
-    local mmcheckin=$MIRRORMANAGERMAPPING[$module]
 
     if [[ ! -f alldirs-$module ]]; then
         # We were asked to check in a module that we hadn't previously
@@ -627,61 +705,30 @@ checkin_module () {
     db3 "Performing mirrormanager checkin for $module (in $moduledir) as $checkinhost"
     logit M "Processing $module (in $moduledir) as $checkinhost"
 
-    # First construct the checkin payload
+    # Construct the checkin payload
     checkin_build_inner_payload $module $mm
+    checkin_encode_inner_payload $mm $mm.enc $checkinhost
+    checkin_build_outer_payload $mm.enc $mx
 
-    # The xmlrpc endpoint requires that the payload be bzip2 compressed
-    bzip2 $mm
+    # Try to check in until we've retried too often.
+    local retries=0
+    local checkinsuccess
+    while (( retries < MAXRETRIES )); do
+        checkin_upload_payload $mx $module
 
-    # base64 encode
-    base64 --wrap=0 $mm.bz2 > $mm.bz2.b64
+        if [[ $? -eq 0 ]]; then
+            checkinsucces=1
+            break
+        fi
 
-    # change '+' to '-'  and '/' to '_'
-    tr '+/' '-_' < $mm.bz2.b64 > $mm.bz2.b64.tr
+        retries=$(( retries +1 ))
+        sleep $(( 2*retries ))
+    done
 
-    # Wrap the transformed, base64 encoded bzip2 compressed json payload in just
-    # the right xml
-    cat >>$mx <<EOF
-<?xml version='1.0'?>
-<methodCall>
-<methodName>checkin</methodName>
-<params>
-<param>
-EOF
-    echo -n "<value><string>" >>$mx
-
-    cat <$mm.bz2.b64.tr >>$mx
-
-    cat >>$mx <<EOF
-</string></value>
-</param>
-</params>
-</methodCall>
-EOF
-
-    # Now actually upload the payload
-    # We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
-    logit M "Making xmlrpc call for $module"
-    curlopts=(--silent)
-    (( VERBOSE >= 4 )) && curlopts=(--verbose)
-    $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
-    curlret=$?
-    if [[ $curlret -ne 0 ]]; then
-        logit E "Checkin failure: curl returned $curlret"
-        (>&2 echo "Checkin failure: curl returned $curlret")
-        finish
-    fi
-
-    # Parse the output to see if we got any useful return
-    # The sed call attempts to strip xml tags.  Easily fooled but we don't expect
-    # any complicated return from mirrormanager.
-    sed -e 's/<[^>]*>//g' curl.out > curl.noxml
-    grep -q -i successful curl.noxml
-
-    if [[ $? -ne 0 ]]; then
-        db1 "Mirrormanager checkin for $module did not appear to succeed."
-        logit E "Doesn't look like we got a good return from mirrormanager."
-        logit E $(cat curl.noxml)
+    # A complete failure to check in doesn't abort execution but should still
+    # be logged
+    if [[ -n $checkinsuccess ]]; then
+        logit E "Could not complete checkin after $MAXRETRIES retries.  Will proceed."
     fi
 
     logit M "Processing $module: end"
