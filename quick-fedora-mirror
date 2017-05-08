@@ -1321,7 +1321,6 @@ if [[ -z $skiptimestamp ]]; then
     fi
 else
     db2 Skipping timestamp save.
-    finish
 fi
 
 # Mirrormanager Checkin and Callout
