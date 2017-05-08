@@ -419,6 +419,10 @@ read_config () {
     if [[ -z $TIMEFILE ]]; then
         (>&2 echo "You must define TIMEFILE in your configuration file ($cfgfile).")
     fi
+
+    # Set some other general variables based on the value of provided
+    # configuration settings
+    [[ -z $CHECKIN_SITE ]] && skipcheckin=1
 }
 
 set_default_vars () {
@@ -1331,7 +1335,7 @@ fi
 # So for each module we mirrored, the filtered file list is correct.  This
 # means that the alldirs-$module file is accurate and we can simply report its
 # contents to mirrormanager.
-if [[ -n $skipcheckin && ! -z $CHECKIN_SITE ]]; then
+if [[ -n $skipcheckin ]]; then
     db2 Performing mirrormanager checkin
     logit m "mirrormanager checkin start"
 
