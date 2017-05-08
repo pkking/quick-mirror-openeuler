@@ -1092,6 +1092,7 @@ process_module () {
 parse_args "$@"
 set_default_vars
 read_config
+# XXX check_dependencies
 
 # Find the previous mirror time, and backdate if necessary
 LASTTIME=0
