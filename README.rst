@@ -126,32 +126,11 @@ will most likely be far slower.
 The Hardlinker
 ==============
 
-Also included is ``quick-fedora-hardlink`` which will find identical files and
-hardlink them.  This duplicates functionality of the existing hardlink tool,
-but can work more quickly by exploiting knowlege of the Fedora repositories,
-namely that all files which are hardlinkable will have identical basenames,
-identical permissions and identical inode ctimes.
+A program to keep your repository fully hardlinked is included.
 
-The hardlinker is written in python, though a zsh version with less
-functionality is also in the repository.
-
-Options
--------
--c  Specify the configuration file to use.  Normally it is found using the same
-    method that the client uses.
-
--n, --dry-run  List what would be hardlinked, but don't actually hardlink
-    anything.
-
---no-ctime  Do not assume that all hardlinkable files will have the same ctime
-    in the file lists.  If the content on the master mirrors is fully
-    hardlinked and the file lists are up to date, the hardlinked files will all have
-    exactly the same ctime entries in the file lists.  Using this knowledge
-    permits a significant optimization, but if the server content isn't fully
-    hardlinked then some opportunities will be missed.
-
-    This is most useful when actually run on the master mirrors to ensure that
-    the master content is synchronized.
+See the `Hardlinker documentation
+<https://docs.pagure.org/quick-fedora-mirror/quick-fedora-hardlink.rst>`_ for
+more information.
 
 Server
 ======
