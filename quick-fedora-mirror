@@ -884,6 +884,27 @@ process_remote_file_list () {
     awk -F '\t' '{print $1}' newfilesizes-$module > newfiles-$module; retcheck $? awk
 }
 
+remove_filelists_from_file () {
+    # Remove the file from $FILELIST and anything given by $EXTRAFILES.
+    # Takes:
+    #   file to modify
+    #   directory of current module (for substituting $mdir)
+    # Modifies the file directly
+    # Calls egrep -v in a loop.  Generally this is called on files of no more
+    # than a few thousand lines, so performance shouldn't be an issue.
+    local f=$1
+    local moduledir=$2
+    local tmp=$f.rfff
+
+    for fl in $FILELIST $EXTRAFILES; do
+        fl=${extra/'$mdir'/$moduledir}
+        egrep -v "^[^/]*/$fl" $f > $tmp
+        mv $tmp $f
+    done
+
+    rm -f $tmp
+}
+
 process_module () {
     # Determine what needs to be transferred and removed from a single module.
     #
@@ -997,8 +1018,8 @@ process_module () {
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module \
-            | uniq -u \
-            | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
+            | uniq -u  > deletefiles-$module
+        remove_filelists_from_file deletefiles-$module $moduledir
         cat deletefiles-$module >> master-deletefiles
 
         # Find dirs on the client which don't exist on the server
