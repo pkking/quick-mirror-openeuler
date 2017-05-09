@@ -424,6 +424,7 @@ read_config () {
     # Set some other general variables based on the value of provided
     # configuration settings
     [[ -z $CHECKIN_SITE ]] && skipcheckin=1
+    [[ -z $MAXCHECKINRETRIES ]] && MAXCHECKINRETRIES=$MAXRETRIES
 }
 
 set_default_vars () {
@@ -666,7 +667,7 @@ checkin_upload_payload () {
     $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
     local curlret=$?
     if [[ $curlret -ne 0 ]]; then
-        logit E "Checkin failure: curl returned $curlret"
+        logit e "Checkin failure: curl returned $curlret"
         (>&2 echo "Checkin failure: curl returned $curlret")
         return 2
     fi
@@ -679,8 +680,8 @@ checkin_upload_payload () {
 
     if [[ $? -ne 0 ]]; then
         db1 "Mirrormanager checkin for $module did not appear to succeed."
-        logit E "Doesn't look like we got a good return from mirrormanager."
-        logit E $(cat curl.noxml)
+        logit e "Doesn't look like we got a good return from mirrormanager."
+        logit e $(cat curl.noxml)
         return 1
     fi
     return 0
@@ -728,25 +729,23 @@ checkin_module () {
     fi
 
     # Try to check in until we've retried too often.
-    local retries=0
-    local checkinsuccess
-    while (( retries < MAXRETRIES )); do
+    local retries=1
+    while true; do
         checkin_upload_payload $mx $module
 
         if [[ $? -eq 0 ]]; then
-            checkinsucces=1
             break
         fi
 
+        if (( retries >= MAXRETRIES )); then
+            logit E "Could not complete checkin after $MAXCHECKINRETRIES tries."
+            break
+        fi
+
+        logit e "Checkin attempt $retries failed.  Will retry."
         retries=$(( retries +1 ))
         sleep $(( 2*retries ))
     done
-
-    # A complete failure to check in doesn't abort execution but should still
-    # be logged
-    if [[ -n $checkinsuccess ]]; then
-        logit E "Could not complete checkin after $MAXRETRIES retries.  Will proceed."
-    fi
 
     logit M "Processing $module: end"
 }
