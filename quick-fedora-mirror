@@ -16,8 +16,6 @@ IFS=$'\n'
 
 # Do this very early
 starttime=$(date +%s)
-# Paranoia; give us a few extra seconds.
-starttime=$(($starttime-5))
 
 # Debug output;
 # Level 0: nothing except errors.
@@ -382,6 +380,10 @@ parse_args () {
                 dumpmmcheckin=$2
                 shift
                 ;;
+            --no-paranoia)
+                # Don't backdate the last mirrortime
+                noparanoia=1
+                ;;
             *)
                 (>&2 echo "Unrecognized argument.")
                 exit 1
@@ -389,8 +391,6 @@ parse_args () {
         esac
         shift
     done
-
-
 }
 
 read_config () {
@@ -959,6 +959,9 @@ process_module () {
     linecount2=$(wc -l < newdirs-$module)
     db2f "New on server:         %7d files, %4d dirs.\n" $linecount $linecount2
 
+    echo XXXXXXXXXXXXXXXXXXXX
+    cat newfiles-$modules
+
     # Add extra files to the transfer list
     echo $moduledir/$fl >> newfiles-$module
     for extra in $EXTRAFILES; do
@@ -1019,8 +1022,12 @@ process_module () {
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module \
-            | uniq -u  > deletefiles-$module
-        remove_filelists_from_file deletefiles-$module $moduledir
+        | uniq -u \
+        | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
+        cat deletefiles-$module
+            #| uniq -u  > deletefiles-$module
+
+        #remove_filelists_from_file deletefiles-$module $moduledir
         cat deletefiles-$module >> master-deletefiles
 
         # Find dirs on the client which don't exist on the server
@@ -1121,6 +1128,9 @@ parse_args "$@"
 set_default_vars
 read_config
 # XXX check_dependencies
+
+# Paranoia; give us a few extra seconds.
+[[ -z $noparanoia ]] && starttime=$(($starttime-5))
 
 # Find the previous mirror time, and backdate if necessary
 LASTTIME=0

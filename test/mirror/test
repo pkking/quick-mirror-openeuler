@@ -149,6 +149,20 @@ test_extrafiles_1 () {
     assertTrue 'The initial copy did not succeed' \
         "$qfm -c $testdir/simple.conf &> $so"
     assertTrue 'imagelist was not copied' "[[ -f $destdir/module-a/imagelist-module-a ]]"
+
+    ls -lR $destdir/module-a
+
+    # Force a file list update
+    sleep 1
+    touch $td1/z
+    $cf -d $td1 -s -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a #-i $td1/imagelist-module-a
+    sleep 5
+    assertTrue 'An update did not succeed' \
+        "$qfm -c $testdir/simple.conf &> $so"
+    cat $so
+    assertTrue 'imagelist seems to have been deleted' "[[ -f $destdir/module-a/imagelist-module-a ]]"
+
+    ls -lR $destdir/module-a
 }
 
 test_extrafiles_2 () {
