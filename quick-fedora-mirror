@@ -717,8 +717,8 @@ checkin_module () {
     logit M "Processing $module (in $moduledir) as $checkinhost"
 
     # Construct the checkin payload
-    checkin_build_inner_payload $module $mm
-    checkin_encode_inner_payload $mm $mm.enc $checkinhost
+    checkin_build_inner_payload $module $mm $checkinhost
+    checkin_encode_inner_payload $mm $mm.enc
     checkin_build_outer_payload $mm.enc $mx
 
     # For the test suite, just dump the checkin info and bail
