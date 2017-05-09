@@ -895,6 +895,7 @@ remove_filelists_from_file () {
     local f=$1
     local moduledir=$2
     local tmp=$f.rfff
+    local fl
 
     for fl in $FILELIST $EXTRAFILES; do
         fl=${extra/'$mdir'/$moduledir}
