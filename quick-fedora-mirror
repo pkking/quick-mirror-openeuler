@@ -377,7 +377,8 @@ parse_args () {
                 shift
                 ;;
             --dump-mm-checkin)
-                # Just for the test suite; dump the raw payload to the given file
+                # Just for the test suite; dump the raw payload to the given
+                # filename with the module name appended.
                 dumpmmcheckin=$2
                 shift
                 ;;
@@ -719,6 +720,12 @@ checkin_module () {
     checkin_build_inner_payload $module $mm
     checkin_encode_inner_payload $mm $mm.enc $checkinhost
     checkin_build_outer_payload $mm.enc $mx
+
+    # For the test suite, just dump the checkin info and bail
+    if [[ -n $dumpmmcheckin ]]; then
+        cat $mx > $dumpmmcheckin-$module
+        return
+    fi
 
     # Try to check in until we've retried too often.
     local retries=0
