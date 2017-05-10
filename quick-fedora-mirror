@@ -959,9 +959,6 @@ process_module () {
     linecount2=$(wc -l < newdirs-$module)
     db2f "New on server:         %7d files, %4d dirs.\n" $linecount $linecount2
 
-    echo XXXXXXXXXXXXXXXXXXXX
-    cat newfiles-$modules
-
     # Add extra files to the transfer list
     echo $moduledir/$fl >> newfiles-$module
     for extra in $EXTRAFILES; do
@@ -1022,12 +1019,8 @@ process_module () {
 
         # Find files on the client which don't exist on the server
         sort allfiles-$module allfiles-$module localfiles-$module \
-        | uniq -u \
-        | egrep -v '^[^/]*/fullfile(time)?list' > deletefiles-$module
-        cat deletefiles-$module
-            #| uniq -u  > deletefiles-$module
-
-        #remove_filelists_from_file deletefiles-$module $moduledir
+            | uniq -u  > deletefiles-$module
+        remove_filelists_from_file deletefiles-$module $moduledir
         cat deletefiles-$module >> master-deletefiles
 
         # Find dirs on the client which don't exist on the server
