@@ -898,7 +898,7 @@ remove_filelists_from_file () {
     local fl
 
     for fl in $FILELIST $EXTRAFILES; do
-        fl=${extra/'$mdir'/$moduledir}
+        fl=${fl/'$mdir'/$moduledir}
         egrep -v "^[^/]*/$fl" $f > $tmp
         mv $tmp $f
     done
