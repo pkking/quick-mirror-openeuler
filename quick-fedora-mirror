@@ -839,8 +839,6 @@ process_remote_file_list () {
     #   allfiles-$module
     #   alldirs-$module
     #   newdirs-$module
-
-
     local module=$1
     local moduledir=$2
 
@@ -1285,7 +1283,7 @@ if [[ -s master-deletedirs ]]; then
 
     if [[ -n $skipdelete && $VERBOSE -ge 2 ]]; then
         logit d Directory deletion skipped
-        echo Not deleting  $linecount directories.  Delete list is:
+        echo "Not deleting  $linecount directories.  Delete list is:"
         cat master-deletedirs
         echo
     else
