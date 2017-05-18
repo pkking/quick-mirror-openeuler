@@ -52,3 +52,13 @@ Non-Fedora Usage
 
 FAQ
 ---
+
+
+Authorship and License
+----------------------
+
+All of this code was originally written by Jason Tibbitts <tibbs@math.uh.edu>
+and has been donated to the public domain.  If you require a statement of
+license, please consider this work to be licensed as "CC0 Universal", any
+version you choose.
+
