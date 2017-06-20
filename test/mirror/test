@@ -172,6 +172,21 @@ test_extrafiles_3 () {
     done
 }
 
+test_mirror_1 () {
+    # Just a simple copy
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/filter.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+    rm -rf $srcdir/master/module-[bc]
+
+    # filter.conf has FILTEREXP='/(file1|file3|dir2/dir2)'
+    # So delete all file1, file3 and any path matching dir2/dir2
+    find $srcdir/master -name file1 -delete
+    find $srcdir/master -name file3 -delete
+    find $srcdir/master -depth -path '*dir2/dir2' -exec rm -rf {} \;
+    assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
+}
+
+
 setUp () {
     # Make three different modules, each with different levels of nesting.
     td1="$master/module-a"
