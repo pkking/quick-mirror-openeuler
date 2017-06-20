@@ -346,35 +346,30 @@ def process_candidates(candidates, skip=False):
     linkedtotal = 0
     savedtotal = 0
     lasttime = time.time()
-    timeleftestimate = 999
     lastspeed = 0
     averagespeed = 25  # Reasonable value to start with
-    smooth = 0.01  # Have to start somewhere
-    error = 0
+    goodsmooth = 0.1
+    badsmooth = 0.5
+    updateinterval = 1000
     left = ''
 
     for _, candidate in candidates.iteritems():
-        # This is just tinkering with producing a completion estimate without
-        # storing history.  It's fun but not much better than the typical
-        # microsoft progress bar.  Oh, well.  The problem is that it can run
-        # along very quickly for a long while and then hit a big file and render
-        # estimates useless.
-        if count % 1000 == 0:
+        if count % updateinterval == 0:
             now = time.time()
-            lastspeed = 1000 / (now - lasttime)
+            lastspeed = updateinterval / (now - lasttime)
             lasttime = now
 
-            # If our speed estimate is too low, that's OK; it will smooth out.
-            # If it's too high, though, then we will correct.
-            error = max((lastspeed - averagespeed) / averagespeed, 0)
-            # The average is mostly meaningless if the error is really bad, so
-            # just bias the estimate upwards
-            if error > 0.5:
-                averagespeed = (lastspeed + averagespeed) / 3.0
-            else:
-                averagespeed = smooth * lastspeed + (1 - smooth) * averagespeed
+            # Bias towards the recent estimate if we're going too slow
+            error = lastspeed / averagespeed
+            smooth = goodsmooth
+            if error < 0.33:
+                smooth = badsmooth
+
+            # A simple weighted average
+            averagespeed = smooth * lastspeed + (1 - smooth) * averagespeed
+
             timeleftestimate = ((total - count) / averagespeed)  # In seconds
-            if count < 5000:
+            if count < 10 * updateinterval:
                 left = '???'
             else:
                 if timeleftestimate < 60:
@@ -383,6 +378,10 @@ def process_candidates(candidates, skip=False):
                     left = '{:.1f}m'.format(timeleftestimate / 60)
                 else:
                     left = '{:.1f}h'.format(timeleftestimate / (60 ** 2))
+
+                # Some really detailed debugging output
+                # left += ' L{:.1f}/s A{:.1f}/s E{:.3f} S{} {}'.format(
+                #     lastspeed, averagespeed, error, smooth, (total - count))
 
         (linked, alreadylinked, saved) = process_one_tuple(candidate, skip=skip)
         linkedtotal += linked
