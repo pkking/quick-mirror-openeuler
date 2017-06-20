@@ -94,7 +94,8 @@ finish () {
 filter () {
     # Client-side file list filtering.
     if [[ -n $FILTEREXP ]]; then
-        sed -i -r -e "\,$FILTEREXP,d" $1
+        db4 filtering $1
+        sed --in-place=-prefilter -r -e "\,$FILTEREXP,d" $1
     fi
 }
 
@@ -872,10 +873,10 @@ process_remote_file_list () {
     fi
 
     # Filter the lists if needed
-    filter allfilesizes-$module
     filter alldirs-$module
-    filter newfiles-$module
     filter newdirs-$module
+    filter allfilesizes-$module
+    filter newfilesizes-$module
 
     # Produce the file lists without sizes.
     awk -F '\t' '{print $1}' allfilesizes-$module > allfiles-$module; retcheck $? awk
