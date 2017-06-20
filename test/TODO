@@ -1,3 +1,4 @@
 Need tests for:
 
-File list filtering (mirror)
+File list filtering
+  Implemented for mirror; needs to be implemented for hardlinker.
