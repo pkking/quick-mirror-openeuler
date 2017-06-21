@@ -306,8 +306,8 @@ do_rsync () {
             sleep $sleep
         else
             # Some other code we didn't anticipate
-            logit E rsync returned $rr.  This is not recoverable.
-            (>&2 echo rsync returned $rr; this is not recoverable.
+            logit E "rsync returned $rr.  This is not recoverable."
+            (>&2 echo "rsync returned $rr.  This is not recoverable."
                 [[ -f $errlog ]] && cat $errlog
             )
             return $rr
