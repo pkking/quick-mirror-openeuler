@@ -661,12 +661,14 @@ checkin_upload_payload () {
     # We have to remove the Expect: header that curl sends but which mirrormanager cannot handle
     local payload=$1
     local module=$2
+    local -a curlopts
+    local curlret
 
     logit M "Making xmlrpc call for $module"
-    local curlopts=(--silent)
+    curlopts=(--silent)
     (( VERBOSE >= 4 )) && curlopts=(--verbose)
     $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
-    local curlret=$?
+    curlret=$?
     if [[ $curlret -ne 0 ]]; then
         logit e "Checkin failure: curl returned $curlret"
         (>&2 echo "Checkin failure: curl returned $curlret")
