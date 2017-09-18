@@ -46,6 +46,13 @@ After a successful mirror run, the client can optionally perform a
 mirrormanager checkin for each changed module.  This eliminates the need to run
 report_mirror, and also avoids another full filesystem traversal.
 
+Note that the client will currently only function which a mirror that has a
+``fedora-buffet`` rsync module which contains all of the other modules within
+it.  This is the case for the Fedora master mirrors as well as many of the
+complete mirrors, but some sites which only mirror parts of the tree do not
+have this module.
+
+
 Installation
 ------------
 
