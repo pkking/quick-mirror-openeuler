@@ -54,11 +54,16 @@ TIMEFILE=
 # Array of default options to pass to rsync
 # Will be modified automatically according to VERBOSITY level; no need to set
 # -q, -v or --info here.
+#
 # You can add excludes here, but the script will always detect those files as
 # missing and will add them back to the file list.  This may generate
-# complaints from rsync, but should not cause any problems.
+# complaints from rsync, but should not cause any problems, though it is almost
+# certainly better to use the provided FILTEREXP to do exclusion instead.
+#
 # Note that some of these options may be required for proper operation of the
-# script.
+# script.  You really should be careful if you change things here, as the
+# default value is carefully crafted and rsync can react in unexpected ways to
+# seeminly compatible sets of arguments.
 # RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
 
 # By default quick-fedora-mirror will try to detect and recover from an aborted
