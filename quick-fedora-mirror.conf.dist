@@ -80,25 +80,28 @@ TIMEFILE=
 
 # DEFINE CHECKIN_SITE and CHECKIN_PASSWORD to perform a mirrormanager checkin
 # at the completion of the run if rsync succeeded without error.  These values
-# should match the site name and site password you have configured in
+# should match the master site name and site password you have configured in
 # mirrormanager.
-# CHECKIN_HOST will default to the output of the hostname command.   Set it if
-# necessary.
+# CHECKIN_HOST will default to the output of the hostname command; you must set
+# it manually if that does not match the hostname you have configured in
+# mirrormanager.
 # The "curl", "bzip2" and "base64" commands must be installed in order to
 # perform mirrormanager checkins.
-#
 # CHECKIN_SITE=
 # CHECKIN_PASSWORD=
 # CHECKIN_HOST=
 
-# If you have configured multiple mirrormanager hostnames to and virtually
+# If you have configured multiple mirrormanager hostnames to virtually
 # spread the modules/categories you mirror between them, then you can configure
-# per-module checkin hosts as follows.  If you don't, then the CHECKIN_HOST you
-# set above, or the default, will apply.  Note that the module name is used,
-# not the mirrormanager category, and that '-' in the module name is replaced
-# by '_' to make a legal variable name.
-# CHECKIN_HOST_fedora_archive
-# CHECKIN_HOST_fedora_alt
+# per-module checkin hosts with variables liks the following.
+# If a specific CHECKIN_HOST_* setting is not configured, then CHECKIN_HOST
+# above will be used.
+# Note that the module name is used, not the mirrormanager category, and that
+# '-' in the module name is replaced by '_' to make a legal variable name.
+# Most sites will hnot need this; it is only necessary when you mirror too many
+# modules for mirrormanager to handle in a single checkin or crawl.
+# CHECKIN_HOST_fedora_archive=
+# CHECKIN_HOST_fedora_alt=
 
 # Verbosity levels - info sent to stdout; usually this gets mailed to root when
 # being run by cron
