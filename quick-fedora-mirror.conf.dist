@@ -79,9 +79,14 @@ TIMEFILE=
 # KEEPDIRTIMES=
 
 # DEFINE CHECKIN_SITE and CHECKIN_PASSWORD to perform a mirrormanager checkin
-# at the completion of the run if rsync succeeded without error.
-# CHECKIN_HOST will default to the output of the hostname command.   Set it if necessary.
-# This requires that "curl" be installed; see CURL above if it's not in /usr/bin.
+# at the completion of the run if rsync succeeded without error.  These values
+# should match the site name and site password you have configured in
+# mirrormanager.
+# CHECKIN_HOST will default to the output of the hostname command.   Set it if
+# necessary.
+# The "curl", "bzip2" and "base64" commands must be installed in order to
+# perform mirrormanager checkins.
+#
 # CHECKIN_SITE=
 # CHECKIN_PASSWORD=
 # CHECKIN_HOST=
