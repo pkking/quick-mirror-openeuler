@@ -945,7 +945,7 @@ process_module () {
     db2 Processing $module
     changed_modules+=$module
 
-    # XXX Could this go in with the version check?
+    # Make sure the list is complete.
     tail -2 $fl | grep -q '^\[End\]$'
     if (( ? != 0 )); then
         (>&2 echo "No end marker.  Corrupted file list?"
