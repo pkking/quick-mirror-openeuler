@@ -919,7 +919,7 @@ process_module () {
     # changed_modules
     #
     # Will leave the following lists in the temporary dir for use by other
-    # functions:
+    # functions: (all of them; currently deletes nothing)
     #
     # May leave other files, but don't depend on them.
 
