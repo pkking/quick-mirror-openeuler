@@ -248,6 +248,36 @@ test_missed_2 () {
         "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
 }
 
+test_missed_3 () {
+    # Test for retransfers when the file list has been locally modified.
+    # Without file list diffing, this does nothing except force a rescan.  With
+    # it (and depending on the change made to the local file list), it will
+    # force an rsync check of some files.  Technically there is no reason to do
+    # this, but it serves as an additional check.
+    local t=$(date +%s)
+
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    # Delete and change some files from the local file list
+    sed -i -e '/file0$/d' -e 's/\(.*\)\t\(.*\)\t\(.*\)\t\(.*file2\)$/2222222222\t\2\t\3\t\4/' \
+        $destdir/module-a/fullfiletimelist-module-a
+
+    # And touch the corresponding files in the master.
+    find $td1 -name file0 -exec touch {} \;
+    find $td1 -name file2 -exec touch {} \;
+
+
+    # Now re-mirror without updating the file list.  Without the diff-based
+    # checks, this shouldn't mirror anything.
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    # And without the diff checks, this will fail because those files weren't updated.
+    assertTrue 'The content was not copied correctly' \
+        "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
+}
+
 # Sleep until the next second tick
 sleep_next_second () {
     sleep 1
