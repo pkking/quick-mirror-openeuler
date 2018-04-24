@@ -515,7 +515,7 @@ check_file_list_version () {
 fetch_file_lists () {
     # Download the file list for each configred module
     # Will set the global variable "checksums" containing the checksum of the
-    # file list of each module.
+    # file list of each module that exists on the client at the beginning of the transfer.
 
     local extra flname module rsyncreturn
 
@@ -531,6 +531,7 @@ fetch_file_lists () {
         flname=${FILELIST/'$mdir'/$moduledir}
         if [[ -f $DESTD/$moduledir/$flname ]]; then
             cp -p $DESTD/$moduledir/$flname $moduledir
+            ln $moduledir/$flname $moduledir/$flname.old
             # ZSHISM (assign assoc. array value)
             checksums[$module]=$(sha1sum $DESTD/$moduledir/$flname | cut -d' ' -f1)
         fi
