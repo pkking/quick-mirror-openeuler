@@ -882,8 +882,10 @@ process_remote_file_list () {
     #   allfiles-$module
     #   alldirs-$module
     #   newdirs-$module
-    local module=$1
-    local moduledir=$2
+
+    local fl=$1
+    local module=$2
+    local moduledir=$3
 
     db3 Extracting file and directory lists for $module.
 
@@ -992,6 +994,7 @@ process_module () {
 
     process_file_list_diff $module $moduledir
     process_remote_file_list $module $moduledir
+    process_remote_file_list $fl $module $moduledir
 
     linecount=$(wc -l < allfiles-$module)
     linecount2=$(wc -l < alldirs-$module)
