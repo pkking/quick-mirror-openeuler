@@ -770,6 +770,15 @@ awk_extract_file_list () {
     retcheck $? awk
 }
 
+awk_extract_paths_from_file_list () {
+    local inf=$1
+    local outf=$inf.paths
+    [[ -n $2 ]] && outf=$2
+
+    awk -F '\t' '{print $4}' < $inf > $outf
+    retcheck $? awk
+}
+
 awk_extract_newer_dirs_restricted () {
     local inf=$1
     local outf=$2
