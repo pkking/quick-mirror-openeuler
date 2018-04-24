@@ -848,6 +848,20 @@ awk_extract_newer_files_no_restricted () {
     retcheck $? awk
 }
 
+process_file_list_diff () {
+    # Diff the old and new file lists
+
+    # Extract the file list part of old and new file lists.
+    # sort each by path
+    # diff --changed-group-format='%>' --unchanged-group-format='' old new > changes
+    # Extract path from changes
+    # Add the result to the master transfer list (or let that happen later in the process)
+
+    # XXX Modify things that come later to use the extracted file list part
+    # from the new file list which we generated here.
+
+}
+
 process_remote_file_list () {
     # Extract various file and directory lists from the master file list
     #
@@ -967,6 +981,7 @@ process_module () {
         return
     fi
 
+    process_file_list_diff $module $moduledir
     process_remote_file_list $module $moduledir
 
     linecount=$(wc -l < allfiles-$module)
