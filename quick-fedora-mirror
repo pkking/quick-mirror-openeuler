@@ -759,8 +759,8 @@ checkin_module () {
 
 awk_extract_file_list () {
     local inf=$1
-    local outf=$2
-    local mdir=$3
+    local outf=$inf.flist
+    [[ -n $2 ]] && outf=$2
 
     awk ' \
         /^\[Files/ {s=1;next}
