@@ -236,7 +236,6 @@ test_missed_2 () {
 
     sleep_next_second
 
-    cat $TESTD/lastmirrortime
     # Now fake the last mirror time so that it looks like we last updated after the files had changed.
     echo LASTTIME=$(date +%s) > $TESTD/lastmirrortime
 
