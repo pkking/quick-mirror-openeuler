@@ -80,7 +80,7 @@ test_update () {
         echo update >> $i
     done
 
-    sleep 1
+    sleep_next_second
 
     # Just update some times
     for i in $(find $srcdir -name file1); do
@@ -186,6 +186,73 @@ test_mirror_1 () {
     assertTrue 'The content was not copied correctly' "dirs_contents_identical $srcdir/master $destdir"
 }
 
+test_missed_1 () {
+    # Make sure we don't miss updates if we pull after files were changed on
+    # the master but before the file lists were updated on the master.
+
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    sleep_next_second
+
+    # Touch some source files and fix the file list
+    find $td1 -name file1 -exec touch {} \;
+    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+
+    sleep_next_second
+
+    # Now fake the last mirror time so that it looks like we last updated after the files had changed.
+    echo LASTTIME=$(date +%s) > $TESTD/lastmirrortime
+
+    # Now re-mirror.  Without the diff-based checks, this shouldn't mirror
+    # anything.
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    assertTrue 'The content was not copied correctly' \
+        "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
+}
+
+test_missed_2 () {
+    # Make sure we don't miss updates if we pull after permissions were changed
+    # on the master but before the file lists were updated on the master.
+
+    # Restrict some perms and generate the file list
+    chmod 770 $td3/dir3
+    chmod 770 $td3/dir4/dir4
+    chmod 770 $td3/dir5/dir5/file0
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/norestrict.conf &> $so"
+    assertFalse 'Errors present in log (3)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    sleep_next_second
+
+    # Change those permissions back
+    chmod 775 $td3/dir3
+    chmod 775 $td3/dir4/dir4
+    chmod 775 $td3/dir5/dir5/file0
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    sleep_next_second
+
+    cat $TESTD/lastmirrortime
+    # Now fake the last mirror time so that it looks like we last updated after the files had changed.
+    echo LASTTIME=$(date +%s) > $TESTD/lastmirrortime
+
+    # Now re-mirror.  Without the diff-based checks, this shouldn't mirror
+    # anything.
+    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    assertTrue 'The content was not copied correctly' \
+        "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
+}
+
+# Sleep until the next second tick
+sleep_next_second () {
+    sleep 1
+}
 
 setUp () {
     # Make three different modules, each with different levels of nesting.
