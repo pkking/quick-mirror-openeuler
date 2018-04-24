@@ -757,6 +757,19 @@ checkin_module () {
     logit M "Processing $module: end"
 }
 
+awk_extract_file_list () {
+    local inf=$1
+    local outf=$2
+    local mdir=$3
+
+    awk ' \
+        /^\[Files/ {s=1;next}
+        /^$/       {if (s==1) exit}
+        s          {print}' \
+        < $inf > $outf
+    retcheck $? awk
+}
+
 awk_extract_newer_dirs_restricted () {
     local inf=$1
     local outf=$2
