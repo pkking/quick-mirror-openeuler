@@ -772,10 +772,10 @@ awk_extract_file_list () {
 
 awk_extract_paths_from_file_list () {
     local inf=$1
-    local outf=$inf.paths
-    [[ -n $2 ]] && outf=$2
+    local outf=$2
+    local mdir=$3
 
-    awk -F '\t' '{print $4}' < $inf > $outf
+    awk -F '\t' "{print \"$mdir/\" \$4}" < $inf > $outf
     retcheck $? awk
 }
 
@@ -861,8 +861,9 @@ process_file_list_diff () {
     # Extract and then diff the old and new file lists for a module
     # Creates changedfiles-$module file
 
-    local mod=$1
-    local fl=$2
+    local fl=$1
+    local mod=$2
+    local mdir=$3
 
     local oldflist=flist-old-$mod
     local newflist=flist-new-$mod
@@ -876,10 +877,14 @@ process_file_list_diff () {
     sort -t$'\t' -k4 $newflist > $newflist.sorted
 
     # compute the changes
-    diff --changed-group-format='%>' --unchanged-group-format='' $oldflist.sorted $newflist-sorted > changes-$mod
+    diff --changed-group-format='%>' --unchanged-group-format='' $oldflist.sorted $newflist.sorted > changes-$mod
 
     # Extract path from changes
+    awk_extract_paths_from_file_list changes-$mod changedpaths-$mod $mdir
 
+    # We must filter here so that files we don't want to transfer won't appear
+    # to have changed.
+    filter changedpaths-$mod
 }
 
 process_remote_file_list () {
@@ -1003,7 +1008,6 @@ process_module () {
         return
     fi
 
-    process_file_list_diff $module $fl
     process_remote_file_list $fl $module $moduledir
 
     linecount=$(wc -l < allfiles-$module)
@@ -1025,6 +1029,10 @@ process_module () {
     totallines=$((totallines+linecount+linecount2+1))
 
     if [[ -d $DESTD/$moduledir ]]; then
+        db3 Finding file list changes since last run
+        process_file_list_diff $fl $module $moduledir
+        cat changedpaths-$module >> transferlist-$module
+
         # XXX Hoist this out to a separate function
         # process_local_file_list $module $moduledir
         db3 Generating local file/dir list
@@ -1119,6 +1127,8 @@ process_module () {
         cat checksumfailed-$module >> transferlist-$module
 
         # Count some things we want to use for stats later.
+        local cntchangedpaths=$(wc -l < changedpaths-$modules)
+
         local cntlocalfiles=$(wc -l < localfiles-$module)
         local cntlocaldirs=$(wc -l < localdirs-$module)
 
@@ -1143,11 +1153,18 @@ process_module () {
         db2f "Size Changed:          %7d files.\n" $cntsizechanged
         db2f "Timestamps to restore: %7d files.\n" $cntupdatetimestamps
         db2f "Checksum Failed:       %7d files.\n" $cntchecksumfailed
+        db2f "Filelist changes:      %7d paths.\n" $cntchangedpaths
     fi
 
     sort -u transferlist-$module >> transferlist-sorted-$module
     cat transferlist-sorted-$module >> master-transferlist
     local cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
+    db2f "Total to transfer:     %7d paths.\n" $cnttotaltransfer
+
+    echo QQQQQQQQQQQQQQQQQQQQQQQQQQQQ
+    cat changedpaths-$module
+    echo QQQQQQQQQQQQQQQQQQQQQQQQQQQQ
+    cat transferlist-sorted-$module
 
     logit P Processing end: $module
     db2 Finished processing $module.
