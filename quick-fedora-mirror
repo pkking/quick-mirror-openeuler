@@ -951,6 +951,7 @@ remove_filelists_from_file () {
     # Modifies the file directly
     # Calls egrep -v in a loop.  Generally this is called on files of no more
     # than a few thousand lines, so performance shouldn't be an issue.
+
     local f=$1
     local moduledir=$2
     local tmp=$f.rfff
