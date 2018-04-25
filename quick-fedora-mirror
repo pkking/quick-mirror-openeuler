@@ -978,13 +978,23 @@ process_module () {
     # functions: (all of them; currently deletes nothing)
     #
     # May leave other files, but don't depend on them.
+    #
+    # The various status variables, for logging:
+    #   cntallserverfiles/cntallserverdirs - total files/dirs on server.
+    #   cntnewserverfiles/cntnewserverdirs - new files/dirs on server (since last mirror time)
+    #   cntlocalfiles/cntlocaldirs - total files/dirs on client.
+    #   cntextrafiles/cntextradirs - files/dirs on client but not server.
+    #   cntmissingfiles/cntmissingdirs - files/dirs on server but not client.
+    #   cntsizechanged - files where size differs between server/client.
+    #   cntupdatetimestamps - dir timestamps to restore
+    #   cntchecksumfailed - files where checksum differs between server/client.
+    #   cntchangedpaths - count of all differences between file lists.
 
     local module=$1
     # ZSHISM? (associative array indexing)
     local moduledir=$MODULEMAPPING[$module]
 
     local fl=${FILELIST/'$mdir'/$moduledir}
-    local totallines=0
     local linecount linecount2
     local extra
 
@@ -1011,13 +1021,13 @@ process_module () {
 
     process_remote_file_list $fl $module $moduledir
 
-    linecount=$(wc -l < allfiles-$module)
-    linecount2=$(wc -l < alldirs-$module)
-    db2f "Total on server:       %7d files, %4d dirs.\n" $linecount $linecount2
+    local cntallserverfiles=$(wc -l < allfiles-$module)
+    local cntallserverdirs=$(wc -l < alldirs-$module)
+    db2f "Total on server:       %7d files, %4d dirs.\n" $cntallserverfiles $cntallserverdirs
 
-    linecount=$(wc -l < newfiles-$module)
-    linecount2=$(wc -l < newdirs-$module)
-    db2f "New on server:         %7d files, %4d dirs.\n" $linecount $linecount2
+    local cntnewserverfiles=$(wc -l < newfiles-$module)
+    local cntnewserverdirs=$(wc -l < newdirs-$module)
+    db2f "New on server:         %7d files, %4d dirs.\n" $cntnewserverfiles $cntnewserverdirs
 
     # Add extra files to the transfer list
     echo $moduledir/$fl >> newfiles-$module
@@ -1027,7 +1037,6 @@ process_module () {
     done
     cat newfiles-$module >> transferlist-$module
     cat newdirs-$module >> transferlist-$module
-    totallines=$((totallines+linecount+linecount2+1))
 
     if [[ -d $DESTD/$moduledir ]]; then
         db3 Finding file list changes since last run
