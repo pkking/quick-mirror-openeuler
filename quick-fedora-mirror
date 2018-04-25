@@ -1138,15 +1138,12 @@ process_module () {
 
         local cntmissingfiles=$(wc -l < missingfiles-$module)
         local cntmissingdirs=$(wc -l < missingdirs-$module)
-        totallines=$((totallines+cntmissingfiles+cntmissingdirs))
 
         local cntsizechanged=$(wc -l < updatedfiles-$module)
-        totallines=$((totallines+cntsizechanged))
 
         local cntupdatetimestamps=$(wc -l < updatetimestamps-$module)
 
         local cntchecksumfailed=$(wc -l < checksumfailed-$module)
-        totallines=$((totallines+cntchecksumfailed))
 
         db2f "Total on client:       %7d files, %4d dirs.\n" $cntlocalfiles $cntlocaldirs
         db2f "Not present on server: %7d files, %4d dirs.\n" $cntextrafiles $cntextradirs
