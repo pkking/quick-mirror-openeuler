@@ -15,6 +15,9 @@ TIMEFILE=
 # REMOTE=rsync://dl.fedoraproject.org
 
 # The master module, which holds the other modules
+# Note that the mirror you pull from MUST have this master module.  You cannot
+# use quick-fedora-mirror to pull from a host which does not have a master
+# module containing the other modules.
 # MASTERMODULE=fedora-buffet
 
 # Tier 1 Fedora mirrors should uncomment the following to get the proper
