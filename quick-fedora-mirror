@@ -1161,11 +1161,6 @@ process_module () {
     local cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
     db2f "Total to transfer:     %7d paths.\n" $cnttotaltransfer
 
-    echo QQQQQQQQQQQQQQQQQQQQQQQQQQQQ
-    cat changedpaths-$module
-    echo QQQQQQQQQQQQQQQQQQQQQQQQQQQQ
-    cat transferlist-sorted-$module
-
     logit P Processing end: $module
     db2 Finished processing $module.
 
