@@ -1127,7 +1127,7 @@ process_module () {
         cat checksumfailed-$module >> transferlist-$module
 
         # Count some things we want to use for stats later.
-        local cntchangedpaths=$(wc -l < changedpaths-$modules)
+        local cntchangedpaths=$(wc -l < changedpaths-$module)
 
         local cntlocalfiles=$(wc -l < localfiles-$module)
         local cntlocaldirs=$(wc -l < localdirs-$module)
