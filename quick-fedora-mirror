@@ -478,11 +478,11 @@ set_default_vars () {
     rsyncver=$(rsync --version | head -1 | awk '{print $3}')
     if [[ $rsyncver == 3.1.3 ]]; then
         # 3.1.3 has broken support for --preallocate and -S (--sparse) together
-        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
+        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i %10l  %n%L')
     elif [[ $rsyncver == 3.1* ]]; then
-        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i  %n%L')
+        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --preallocate --delay-updates --out-format='@ %i %10l  %n%L')
     else
-        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i  %n%L')
+        RSYNCOPTS=(-aSH -f 'R .~tmp~' --stats --delay-updates --out-format='@ %i %10l  %n%L')
     fi
 
     MASTERMODULE=fedora-buffet
