@@ -868,6 +868,8 @@ process_file_list_diff () {
     local oldflist=flist-old-$mod
     local newflist=flist-new-$mod
 
+    logit l "Generating database diff start: $mod"
+
     # Extract the file list part of old and new file lists.
     awk_extract_file_list $fl.old flist-old-$mod
     awk_extract_file_list $fl flist-new-$mod
@@ -885,6 +887,8 @@ process_file_list_diff () {
     # We must filter here so that files we don't want to transfer won't appear
     # to have changed.
     filter changedpaths-$mod
+
+    logit l "Generating database diff end: $mod"
 }
 
 process_remote_file_list () {
