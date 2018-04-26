@@ -143,6 +143,7 @@ TIMEFILE=
 # g - file list generation start/end
 # k - lock contention
 # l - per-module local file list generation (recursive find) start/end
+# L - file list generation counts
 # m - mirrormanager checkin
 # M - mirrormanager checkin detail
 # n - lack of updates in a run
