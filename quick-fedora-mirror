@@ -1172,7 +1172,7 @@ process_module () {
     local cnttotaltransfer=$(wc -l < transferlist-sorted-$module)
     db2f "Total to transfer:     %7d paths.\n" $cnttotaltransfer
 
-    logit L "Counts: Svr:$cntallserverfiles/$cntallserverdirs Loc:$cntlocalfiles/$cntlocaldirs Diff:$cntchangedpaths New:$cntnewserverfiles/$cntnewserverdirs Xtra:$cntextrafiles/$cntextradirs Miss:$cntmissingfiles/$cntmissingdirs Size:$cntsizechanged Csum:$cntchecksumfailed Dtim:$cntupdatetimestamps"
+    logit L "Counts for $module: Svr:$cntallserverfiles/$cntallserverdirs Loc:$cntlocalfiles/$cntlocaldirs Diff:$cntchangedpaths New:$cntnewserverfiles/$cntnewserverdirs Xtra:$cntextrafiles/$cntextradirs Miss:$cntmissingfiles/$cntmissingdirs Size:$cntsizechanged Csum:$cntchecksumfailed Dtim:$cntupdatetimestamps"
     logit P Processing end: $module
     db2 Finished processing $module.
 
