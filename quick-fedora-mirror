@@ -810,12 +810,25 @@ awk_extract_file_list () {
     retcheck $? awk
 }
 
-awk_extract_paths_from_file_list () {
+awk_extract_paths_from_file_list_restricted () {
     local inf=$1
     local outf=$2
     local mdir=$3
 
+    # We can just ignore the type and permissions completely
     awk -F '\t' "{print \"$mdir/\" \$4}" < $inf > $outf
+    retcheck $? awk
+}
+
+awk_extract_paths_from_file_list_norestricted () {
+    local inf=$1
+    local outf=$2
+    local mdir=$3
+
+    awk -F '\t' " \
+        { if (\$2 == \"d\" || \$2 == \"f\" || \$2 == \"l\") \
+            print \"$mdir/\" \$4 \
+        }" < $inf > $outf
     retcheck $? awk
 }
 
@@ -922,7 +935,11 @@ process_file_list_diff () {
     diff --changed-group-format='%>' --unchanged-group-format='' $oldflist.sorted $newflist.sorted > changes-$mod
 
     # Extract path from changes
-    awk_extract_paths_from_file_list changes-$mod changedpaths-$mod $mdir
+    if [[ -n $PREBITFLIP ]]; then
+        awk_extract_paths_from_file_list_restricted changes-$mod changedpaths-$mod $mdir
+    else
+        awk_extract_paths_from_file_list_norestricted changes-$mod changedpaths-$mod $mdir
+    fi
 
     # We must filter here so that files we don't want to transfer won't appear
     # to have changed.
