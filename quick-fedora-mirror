@@ -320,15 +320,51 @@ do_rsync () {
     return $rr
 }
 
+usage () {
+    cat <<END
+Usage: quick-fedora-mirror [OPTION]
+
+Update a local mirror of Fedora content via rsync and perform a mirrormanager
+checkin.
+
+Requires a configuration file; will search for this file in the following
+locations:
+
+  The path provided by -c/--config.
+  /etc/quick-fedora-mirror.conf
+  ~/.config/quick-fedora-mirror.conf
+  quick-fedora-mirror.conf in the same directory as this script.
+  quick-fedora-mirror.conf in the current directory.
+
+Options:
+  -a, --alwayscheck     Always compare local content with file lists, even if
+                        file lists have not changed.
+  -c, --config PATH     Specify configuration file instead of searching.
+  -d LEVEL              Specify debugging level (0-9).
+  -h, --help            This message.
+  -n, --dry-run         Show what would be transferred, but do not actually
+                        transfer, delete or check in.
+  -N, --transfer-only   Download, but do not delete or check in.
+  -t TIMESTAMP          Use TIMESTAMP (in seconds since epuch) as the last
+                        mirror time.
+  -T, --backdate TIME   Use TIME (a human readable date) as the last mirror
+                        time.
+  --checkin-only        Force a mirrormanager checkin for all modules, but o
+                        not transfer, delete or update the timestamp.
+END
+  #--dir-times           Update all directory times. (Not implemented.)
+  #--refresh REGEX       Re-transfer all paths matching REGEX.  (Not implemented.)
+}
+
 parse_args () {
     # Process arguments, setting all sorts of globals
     while [[ $# > 0 ]]; do
         opt=$1
         case $opt in
-            -a)
+            -a | --alwayscheck)
                 alwayscheck=1
                 ;;
-            -c)
+            -c | --config)
                 cfgfile=$2
                 shift
                 if [[ ! -r $cfgfile ]]; then
@@ -340,21 +376,25 @@ parse_args () {
                 verboseopt=$2
                 shift
                 ;;
-            -n)
+            -h | --help)
+                usage
+                exit 1
+                ;;
+            -n | --dry-run)
                 rsyncdryrun=1
                 skipdelete=1
                 skiptimestamp=1
                 ;;
-            -N)
+            -N | --transfer-only)
                 skipdelete=1
                 skiptimestamp=1
                 ;;
-            -t)
+            -t )
                 backdate=$2
                 alwayscheck=1
                 shift
                 ;;
-            -T)
+            -T | --backdate)
                 backdate=$(date -d "$2" +%s)
                 alwayscheck=1
                 shift
