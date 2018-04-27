@@ -217,7 +217,7 @@ test_filter_2 () {
 }
 
 
-test_missed_1 () {
+test_diff_1 () {
     # Make sure we don't miss updates if we pull after files were changed on
     # the master but before the file lists were updated on the master.
 
@@ -244,7 +244,7 @@ test_missed_1 () {
         "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
 }
 
-test_missed_2 () {
+test_diff_2 () {
     # Make sure we don't miss updates if we pull after permissions were changed
     # on the master but before the file lists were updated on the master.
 
@@ -279,7 +279,7 @@ test_missed_2 () {
         "dirs_contents_identical $srcdir/master/module-c $destdir/module-c"
 }
 
-test_missed_3 () {
+test_diff_3 () {
     # Test for retransfers when the file list has been locally modified.
     # Without file list diffing, this does nothing except force a rescan.  With
     # it (and depending on the change made to the local file list), it will
