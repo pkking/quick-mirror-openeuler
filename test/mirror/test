@@ -308,6 +308,35 @@ test_diff_3 () {
         "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
 }
 
+test_diff_4 () {
+    # Test with changes in protected content to ensure that we don't
+    # accidentally transfer too much.
+
+    # Restrict some content
+    chmod 770 $td3/dir3
+    chmod 770 $td3/dir4/dir4
+    chmod 770 $td3/dir5/dir5/file0
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/norestrict.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (3)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    sleep_next_second
+
+    # Touch some files and regenerate
+    find $td3 -name file0 -exec touch {} \;
+    find $td3 -name file2 -exec touch {} \;
+    $cf -d $td3 -f $td3/fullfilelist -t $td3/fullfiletimelist-module-c
+
+    assertTrue 'A simple copy did not succeed' "$qfm -c $testdir/norestrict.conf &> $so" # 2> $se"
+    assertFalse 'Errors present in log (3)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+    for i in dir3 dir3/file0 dir3/dir1 dir3/dir1/file0 dir4/dir4 dir4/dir4/file0 dir5/dir5/file0; do
+        assertFalse "Restricted content $i should not have been copied" \
+            "[[ -e $destdir/module-c/$i ]]"
+    done
+}
+
 # Sleep until the next second tick
 sleep_next_second () {
     sleep 1
