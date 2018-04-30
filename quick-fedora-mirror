@@ -249,6 +249,7 @@ do_rsync () {
     local log=$(mktemp -p . rsync-out-XXXXXX.log)
     local errlog=$(mktemp -p . rsync-err-XXXXXX.log)
     local sleep rr rvbash rvzsh
+    local rsyncto="--timeout=$RSYNCTIMEOUT"
 
     local -a verboseopts
 
@@ -271,22 +272,24 @@ do_rsync () {
         # Or just use a freaking global.
 
         # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
-        db3 Calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+        # XXX But this is terrible, and at least the option list generation should be consolidated.
+        db3 Calling $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
         logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
         if (( VERBOSE >= 5 )); then
-            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest | tee $log
+            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest | tee $log
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         elif (( VERBOSE >= 2 )); then
-            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
+            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         else
-            $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
+            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         fi
 
         # We should ignore; 0 (obviously), 24
-        # If we retried on 24 (missing files on server) we'd never make progress.
+        # If we retried on 24 (files vanished on server) we'd never make progress.
         # We should retry: 5 10 23 30 35
+        # XXX We should grep the log and not retry on 23 with files missing from server
         if (( rr == 0 )); then
             break
         elif (( rr == 24 )); then
@@ -512,6 +515,7 @@ set_default_vars () {
     MIRRORMANAGER=https://admin.fedoraproject.org/mirrormanager/xmlrpc
     REMOTE=rsync://dl.fedoraproject.org
     RSYNC=/usr/bin/rsync
+    RSYNCTIMEOUT=$((60 * 10))
     WARNDELAY=$((60 * 60 * 24))
     MAXRETRIES=10
 

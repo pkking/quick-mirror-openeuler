@@ -48,11 +48,15 @@ TIMEFILE=
 # MODULEMAPPING=(fedora-alt alt  fedora-archive archive
 #                fedora-enchilada fedora  fedora-epel epel)
 
+# curl binary (only if MirrorManager checkins are enabled; see below).
+# CURL=/usr/bin/curl
+
 # rsync binary
 # RSYNC=/usr/bin/rsync
 
-# curl binary (only if MirrorManager checkins are enabled; see below).
-# CURL=/usr/bin/curl
+# Rsync timeout value, in seconds
+# Will be passed to rsync via --timeout.
+# RSYNCTIMEOUT=600
 
 # Array of default options to pass to rsync
 # Will be modified automatically according to VERBOSITY level; no need to set
