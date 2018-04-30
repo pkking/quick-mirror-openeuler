@@ -261,7 +261,8 @@ do_rsync () {
     # Usually we won't want to see this.
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
 
-    flopts=(--files-from=$files)
+    local flopts=(--files-from=$files)
+    local allopts=($rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest)
 
     while true; do
         runcount=$(( runcount+1 ))
@@ -273,16 +274,16 @@ do_rsync () {
 
         # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
         # XXX But this is terrible, and at least the option list generation should be consolidated.
-        db3 Calling $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
-        logit c calling $RSYNC $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest
+        db3 Calling $RSYNC $allopts
+        logit c calling $RSYNC $allopts
         if (( VERBOSE >= 5 )); then
-            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest | tee $log
+            $RSYNC $allopts | tee $log
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         elif (( VERBOSE >= 2 )); then
-            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log
+            $RSYNC $allopts >> $log
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         else
-            $RSYNC $rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest >> $log 2>> $errlog
+            $RSYNC $allopts >> $log 2>> $errlog
             rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         fi
 
