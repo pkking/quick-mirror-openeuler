@@ -304,6 +304,19 @@ do_rsync () {
                 [[ -f $errlog ]] && (>&2 cat $errlog)
                 return $rr
             fi
+            # 23 can mean multiple different things.  We want to stop
+            # processing if we're trying to transfer a file that doesn't
+            # exist on the server.  There is no point retrying because the file
+            # list is wrong.
+            if [[ $rr -eq 23 && -f $errlog ]] ; then
+                grep '^rsync: link_stat .* failed: No such file or directory \(2\)$' $errlog
+                if (( ? == 0 )); then
+                    logit E |"rsync from $REMOTE failed; file list incorrect or out of date"
+                    (>&2 echo "Could not sync from $REMOTE; file list incorrect or out of date")
+                    [[ -f $errlog ]] && (>&2 cat $errlog)
+                    return $rr
+                fi
+            fi
             sleep=$(( 2 ** runcount ))
             logit e "rsync returned $rr (retryable), sleeping for $sleep"
             db2 rsync failed: sleeping for $sleep
