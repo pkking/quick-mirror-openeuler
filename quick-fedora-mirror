@@ -251,7 +251,7 @@ do_rsync () {
     local sleep rr rvbash rvzsh
     local rsyncto="--timeout=$RSYNCTIMEOUT"
 
-    local -a verboseopts
+    local -a verboseopts flopts allopts
 
     # These add to the default rsync verbosity
     (( VERBOSE >= 7 )) && verboseopts+=(--progress)
@@ -261,8 +261,8 @@ do_rsync () {
     # Usually we won't want to see this.
     (( VERBOSE <= 3 )) && verboseopts+=(--no-motd)
 
-    local flopts=(--files-from=$files)
-    local allopts=($rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest)
+    flopts=("--files-from=$files")
+    allopts=($rsyncto $RSYNCOPTS $verboseopts $flopts ${(P)opts} $src $dest)
 
     while true; do
         runcount=$(( runcount+1 ))
