@@ -366,9 +366,9 @@ Options:
                         mirror time.
   -T, --backdate TIME   Use TIME (a human readable date) as the last mirror
                         time.
-  --checkin-only        Force a mirrormanager checkin for all modules, but o
-                        not transfer, delete or update the timestamp.
 END
+  #--checkin-only        Force a mirrormanager checkin for all modules, but do
+  #                      not transfer, delete or update the timestamp.
   #--dir-times           Update all directory times. (Not implemented.)
   #--refresh REGEX       Re-transfer all paths matching REGEX.  (Not implemented.)
 }
