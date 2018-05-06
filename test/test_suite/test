@@ -14,6 +14,8 @@ test_dirs_similar_2 () {
     mkdir $td/a $td/b
     touch $td/a/z
 
+    ls -lR $td
+
     assertFalse 'Dirs should differ' "dirs_similar $td/a $td/b"
 }
 
@@ -28,6 +30,8 @@ test_dirs_contents_identical_2 () {
     create_dir_structure $td/a
     cp -rp $td/a $td/b
 
+    sleep_next_second
+
     touch $td/b/dir2/file2
     assertFalse '2nd dir should have a newer file' "dirs_contents_identical $td/a $td/b"
 }
@@ -36,6 +40,8 @@ test_dirs_contents_identical_3 () {
     create_dir_structure $td/a
     cp -rp $td/a $td/b
 
+    sleep_next_second
+
     touch $td/a/dir2/file2
     assertFalse '1st dir should have a newer file' "dirs_contents_identical $td/a $td/b"
 }
@@ -43,15 +49,16 @@ test_dirs_contents_identical_3 () {
 test_dirs_contents_identical_4 () {
     create_dir_structure $td/a
     cp -rp $td/a $td/b
-
+    sleep_next_second
     touch $td/b/dir2
+
     assertTrue 'A directory timestamp difference should be OK'  "dirs_contents_identical $td/a $td/b"
 }
 
 test_dirs_contents_identical_5 () {
     create_dir_structure $td/a
     cp -rp $td/a $td/b
-
+    sleep_next_second
     echo a >> $td/b/dir2/file2
     assertFalse 'Dirs should differ by file time and size' "dirs_contents_identical $td/a $td/b"
 }
