@@ -144,6 +144,11 @@ file_contains () {
     grep -P -- "$p" $f
 }
 
+# Sleep until the next second tick
+sleep_next_second () {
+    sleep 1
+}
+
 oneTimeSetUp () {
     # For this test suite we'll be doing the same setup for everything
     sd=$SHUNIT_TMPDIR/scratch

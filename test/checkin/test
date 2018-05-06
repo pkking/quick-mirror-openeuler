@@ -27,7 +27,7 @@ test_checkin () {
     assertTrue 'Module name missing' "file_contains $dc \"test-suite-a...{\""
     for i in $(find $td/ -type d); do
         d=${i/$td\//}
-        assertTrue "Dir missing $d" "file_contains $dc \"    .$d.: {}\""
+        assertTrue "Dir missing $d" "file_contains $dc \"\s\s\s\s.$d.:\s{}\""
     done
 }
 
