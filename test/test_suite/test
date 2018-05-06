@@ -14,8 +14,6 @@ test_dirs_similar_2 () {
     mkdir $td/a $td/b
     touch $td/a/z
 
-    ls -lR $td
-
     assertFalse 'Dirs should differ' "dirs_similar $td/a $td/b"
 }
 
