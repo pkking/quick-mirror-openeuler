@@ -1,15 +1,15 @@
 #!/bin/zsh
 failed=0
-for i in test/*/test; do
-    if [[ -x $i ]]; then
-        echo "=========="
-        echo "Running: ${i:h:t}"
-        echo "----------"
-        $i
+for i in test/*; do
+    [[ ! -d $i ]] && continue
+    echo "=========="
+    echo "Running ${i:t} tests"
+    echo "----------"
+    for j in $i/test*; do
+        [[ ! -x $j ]] && continue
+        $j
         [[ $? -ne 0 ]] && failed=1
-    else
-        echo "=========="
-        echo "Skipping: ${i:h:t}"
-    fi
+        echo
+    done
 done
 exit $failed
