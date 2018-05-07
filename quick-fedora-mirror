@@ -81,14 +81,13 @@ lock () {
 }
 
 finish () {
-    # Finish up.  Dump the output file to stdout unless an argument is passed.
+    # Finish up.  Dump the output file to stdout and exit 1 unless an argument is passed.
+    local ret=$1
     db1 "========================="
-    db1 "Mirror finished: $(date)"
-    logit R "Run end."
-    if [[ -z $1 ]]; then
-        cat $outfile
-    fi
-    exit 0
+    db1 "Mirror finished: $(date) ($ret)"
+    logit R "Run end; exiting $ret."
+    (( ret > 0 )) && cat $outfile
+    exit $ret
 }
 
 filter () {
@@ -603,7 +602,7 @@ fetch_file_lists () {
     if [[ $rsyncreturn -ne 0 ]]; then
         (>&2 echo "rsync finished with nonzero exit status.\nCould not retrieve file lists.")
         logit E Aborting due to rsync failure while retrieving file lists
-        finish
+        finish 1
     fi
 
     # Log very basic stats
@@ -1380,7 +1379,7 @@ done
 if [[ ! -e master-transferlist ]]; then
     logit n No changes to synchronize
     db2 No changed files.
-    finish no
+    finish 0
 fi
 
 if [[ -n $MIRRORBUFFET ]]; then
@@ -1406,7 +1405,7 @@ rsyncreturn=$?
 if [[ $rsyncreturn -ne 0 ]]; then
     (>&2 echo "rsync finished with nonzero exit status.\nWill not check in or delete anything.")
     logit E skipping further operations due to rsync failure
-    finish
+    finish 1
 fi
 
 # Total downloaded file count, bytes received, transfer speed
@@ -1532,4 +1531,4 @@ if [[ -z $skipcheckin || -n $dumpmmcheckin ]]; then
 
     logit m "mirrormanager checkin end"
 fi
-finish
+finish 0
