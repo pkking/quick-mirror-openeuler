@@ -569,6 +569,21 @@ check_file_list_version () {
     exit 1
 }
 
+clean_all_transfer_temps () {
+    # Delete temporary transfer files, but not any log files.
+    # Be sure to add any extra generated temporaries here.
+    # XXX Is it OK that this doesn't delete the file lists?  They will just get
+    # copied over.
+    rm -f *.old
+    for i in alldirs allfiles allfilesizes changedpaths changes \
+        checksumfailed checksums deletedirs deletefiles flist localdirs \
+        localfiles localfilesizes localfulllist master missingdirs \
+        missingfiles newdirs newfiles staletmpdirs staletmpfiles \
+        transferlist updatedfiles updatetimestamps; do
+        rm -f $i-*
+    done
+}
+
 fetch_file_lists () {
     # Download the file list for each configred module
     # Will set the global variable "checksums" containing the checksum of the
