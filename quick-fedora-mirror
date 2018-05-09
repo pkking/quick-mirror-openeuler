@@ -61,6 +61,12 @@ logit () {
    if (( VERBOSE >= 3 )); then
        db3 Log: $err $*
    fi
+
+   # XXX Consider sending errors to stdout
+   #if [[ -n $err ]]; then
+   #    (>&2 echo $*)
+   #fi
+
 }
 
 retcheck () {
