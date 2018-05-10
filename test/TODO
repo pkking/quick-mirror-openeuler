@@ -1,4 +1,7 @@
 Need tests for:
 
+File list outdated version
+File list corrupted
+
 File list filtering
   Implemented for mirror; needs to be implemented for hardlinker.
