@@ -580,9 +580,9 @@ clean_all_transfer_temps () {
     # XXX Is it OK that this doesn't delete the file lists?  They will just get
     # copied over.
     rm -f *.old
-    for i in alldirs allfiles allfilesizes changedpaths changes \
-        checksumfailed checksums deletedirs deletefiles flist localdirs \
-        localfiles localfilesizes localfulllist master missingdirs \
+    for i in ${(v)MODULEMAPPING} alldirs allfiles allfilesizes changedpaths \
+        changes checksumfailed checksums deletedirs deletefiles flist \
+        localdirs localfiles localfilesizes localfulllist master missingdirs \
         missingfiles newdirs newfiles staletmpdirs staletmpfiles \
         transferlist updatedfiles updatetimestamps; do
         rm -f $i-*
