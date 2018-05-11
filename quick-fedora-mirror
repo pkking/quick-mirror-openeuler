@@ -601,6 +601,7 @@ fetch_file_lists () {
     db2 Downloading file lists
     # ZSHISM (declare associative array)
     typeset -g -A checksums
+    checksums=()
     for module in $MODULES; do
         # ZSHISM? (associative array indexing)
         moduledir=$MODULEMAPPING[$module]
