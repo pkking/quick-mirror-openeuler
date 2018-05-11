@@ -278,19 +278,18 @@ do_rsync () {
         # Or just use a freaking global.
 
         # We have to do this separately because you can't redirect to /dev/stderr when running under sudo.
-        # XXX But this is terrible, and at least the option list generation should be consolidated.
+        # ZSHISM Teeing both stderr and stdout while keeping the return code is
+        # easy in zsh with multios but seems to be terribly difficult under bash.
         db3 Calling $RSYNC $allopts
         logit c calling $RSYNC $allopts
         if (( VERBOSE >= 5 )); then
-            $RSYNC $allopts | tee $log
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
+            $RSYNC $allopts 1>&1 2>&2 >> $log 2>> $errlog
         elif (( VERBOSE >= 2 )); then
-            $RSYNC $allopts >> $log
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
+            $RSYNC $allopts >> $log 2>&2 2>> $errlog
         else
             $RSYNC $allopts >> $log 2>> $errlog
-            rvbash="${PIPESTATUS[0]}" rvzsh="${pipestatus[1]}" rr=$rvbash$rvzsh
         fi
+        rr=$?
 
         # We should ignore; 0 (obviously), 24
         # If we retried on 24 (files vanished on server) we'd never make progress.
