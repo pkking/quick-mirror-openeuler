@@ -1,0 +1,51 @@
+#!/bin/zsh
+# Do some basic testing of the retry functionality.
+#
+# It's hard to test rsync failures without mocking rsync.
+#
+# Can test one thing with newdark: Delete a file before the transfer and dee that we deal with the 23 result code properly.
+#
+# For other things, we can replace rsync with a script that exits with the
+# right value.  But it might need to support enough of rsync to output the
+# version info when needed, because qfm wants that info.
+
+source ${0:h}/common-start
+
+test_retry_1 () {
+    # Test the "link_stat: no such file or directory" failure mode by deleting
+    # a file before the transfer.
+
+    find $td1 -name file1 -delete
+
+    assertFalse 'Copy should not succeed.' \
+        "$qfm --no-paranoia -c $testdir/retry.conf &> $so"
+
+    assertTrue 'Outdated file list not detected' "file_contains $mdir/qfm.log \"Looks like the file list is outdated\""
+
+#    sleep_next_second
+
+    # Touch some source files and fix the file list
+#    find $td1 -name file1 -exec touch {} \;
+#    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+
+#    sleep_next_second
+
+    # Now fake the last mirror time so that it looks like we last updated after the files had changed.
+#    echo LASTTIME=$(date +%s) > $TESTD/lastmirrortime
+
+    # Now re-mirror.  Without the diff-based checks, this shouldn't mirror
+    # anything.
+#    assertTrue 'A simple copy did not succeed' "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+#    assertFalse 'Errors present in log (1)' "file_contains $mdir/qfm.log \"E[rR][rR]\""
+
+#    assertTrue 'The content was not copied correctly' \
+#        "dirs_contents_identical $srcdir/master/module-a $destdir/module-a"
+}
+
+
+source ${0:h}/common-end
+
+# load shunit2
+SHUNIT_PARENT=$0
+setopt shwordsplit
+. $(find-shunit)
