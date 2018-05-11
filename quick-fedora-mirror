@@ -291,54 +291,60 @@ do_rsync () {
         fi
         rr=$?
 
-        # We should ignore; 0 (obviously), 24
-        # If we retried on 24 (files vanished on server) we'd never make progress.
-        # We should retry: 5 10 23 30 35
-        # XXX We should grep the log and not retry on 23 with files missing from server
+        # Check return values
         if (( rr == 0 )); then
-            break
+            logit C rsync call completed succesfully with return $rr
+            parse_rsync_stats $log
+            return 0
+
         elif (( rr == 24 )); then
-            logit e "rsync says source files vanished; ignoring"
-            break
+            # 24: Partial transfer due to vanished source files
+            logit e "rsync says source files vanished."
+            return $rr
+
         elif (( rr == 5 || rr == 10 || rr == 23 || rr == 30 || rr == 35 )); then
-            # First see if we've already tried too many times
+            # Most of these are retryable network issues
+            #  5: Error starting client-server protocol
+            # 10: Error in socket I/O
+            # 30: Timeout in data send/receive
+            # 35: Timeout waiting for daemon connection
+            # 23: Partial transfer due to error
+            #     (could be a file list problem)
+            if [[ $rr -eq 23 && -f $errlog ]] ; then
+                # See if it we tried to tranfer files that don't exist
+                grep -q '^rsync: link_stat .* failed: No such file or directory (2)$' $errlog
+                if (( ? == 0 )); then
+                    logit e "Looks like the file list is outdated."
+                    (>&2 echo "Looks like the file list is outdated.")
+                    [[ -f $errlog ]] && (>&2 cat $errlog)
+                    return $rr
+                fi
+            fi
+
+            # It's not one of those special 23 errors, so we may retry.  First
+            # see if we've already tried too many times.
             if (( runcount >= MAXRETRIES )); then
                 logit E rsync from $REMOTE failed
                 (>&2 echo "Could not sync from $REMOTE")
                 [[ -f $errlog ]] && (>&2 cat $errlog)
                 return $rr
             fi
-            # 23 can mean multiple different things.  We want to stop
-            # processing if we're trying to transfer a file that doesn't
-            # exist on the server.  There is no point retrying because the file
-            # list is wrong.
-            if [[ $rr -eq 23 && -f $errlog ]] ; then
-                grep '^rsync: link_stat .* failed: No such file or directory \(2\)$' $errlog
-                if (( ? == 0 )); then
-                    logit E |"rsync from $REMOTE failed; file list incorrect or out of date"
-                    (>&2 echo "Could not sync from $REMOTE; file list incorrect or out of date")
-                    [[ -f $errlog ]] && (>&2 cat $errlog)
-                    return $rr
-                fi
-            fi
+
+            # Then sleep for a bit
             sleep=$(( 2 ** runcount ))
             logit e "rsync returned $rr (retryable), sleeping for $sleep"
             db2 rsync failed: sleeping for $sleep
             sleep $sleep
-        else
-            # Some other code we didn't anticipate
-            logit E "rsync returned $rr."
-            (>&2 echo "rsync returned $rr."
-                [[ -f $errlog ]] && cat $errlog
-            )
-            return $rr
+            continue
         fi
+
+        # We only get here if we got a return we didn't expect
+        logit E "rsync returned $rr, which was not expected."
+        (>&2 echo "rsync returned $rr, which was not expected."
+            [[ -f $errlog ]] && cat $errlog
+        )
+        return $rr
     done
-
-    logit C rsync call completed succesfully with return $rr
-
-    parse_rsync_stats $log
-    return $rr
 }
 
 usage () {
