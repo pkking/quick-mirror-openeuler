@@ -1412,6 +1412,7 @@ sort -u master-transferlist > master-transferlist.sorted
 linecount=$(wc -l < master-transferlist.sorted)
 sep; sep
 db2 Transferring $linecount files.
+# XXX send total count to log as well
 
 # Now we have a list of everything which has changed recently in every module
 # we want, pass that to rsync (non recursive mode!) and it should transfer just
