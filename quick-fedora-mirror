@@ -245,9 +245,9 @@ do_rsync () {
     #   3) The list of files
     #   4) The name of an array containing additional rsync options
     #
-    # This may sleep and retry when receiving an error.
-    # Returns the last rsync return code; 0 if no error.
-    #
+    # This may sleep and retry when receiving specific errors.
+    # Returns the rsync return code (where 0 indicates full success, but other
+    # values may indicate a finished copy).
 
     local src=$1 dest=$2 files=$3 opts=$4
     local runcount=0
