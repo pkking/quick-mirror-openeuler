@@ -87,12 +87,18 @@ lock () {
 }
 
 finish () {
-    # Finish up.  Dump the output file to stdout and exit 1 unless an argument is passed.
+    # Finish up.
+    #
+    # Takes two optional arguments.  The first is the return value; the script
+    # will exit with that value and will dump the output file to stdout if the
+    # value is nonzero.  If the second is nonempty, the output will be dumped
+    # regardless of the return value.
     local ret=$1
+    local out=$2
     db1 "========================="
     db1 "Mirror finished: $(date) ($ret)"
     logit R "Run end; exiting $ret."
-    (( ret > 0 )) && cat $outfile
+    [[ $ret -gt 0 || -n $out ]] && cat $outfile
     exit $ret
 }
 
@@ -1558,4 +1564,4 @@ if [[ -z $skipcheckin || -n $dumpmmcheckin ]]; then
 
     logit m "mirrormanager checkin end"
 fi
-finish 0
+finish 0 yes
