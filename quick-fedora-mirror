@@ -1054,6 +1054,63 @@ generate_local_file_list () {
     logit l "Generating local file list end: $mod"
 }
 
+process_local_file_list () {
+    # Compare what the client has to what the server has, and generate more
+    # lists based on that.
+    # Generates the fillowing file lists:
+    #     deletefiles-$module
+    #     deletedirs-$module
+    #     updatetimestamps-$module
+    #     missingfiles-$module
+    #     missingdirs-$module
+    #     updatedfiles-$module
+    #     checksumfailed-$module
+
+    # XXX Don't do any master transferlist manipulation here.
+    local mod=$1
+    local mdir=$2
+
+    # Find files on the client which don't exist on the server
+    sort allfiles-$mod allfiles-$mod localfiles-$mod \
+        | uniq -u  > deletefiles-$mod
+    remove_filelists_from_file deletefiles-$mod $mdir
+
+    # Find dirs on the client which don't exist on the server
+    sort alldirs-$mod alldirs-$mod localdirs-$mod \
+        | uniq -u > deletedirs-$mod
+
+    # Extract dirnames of every file and dir in the delete lists, and all of their parents.
+    if [[ -n $updatealldirtimes ]]; then
+        echo $mdir > updatetimestamps-$mod
+        cat alldirs-$mod >> updatetimestamps-$mod
+    else
+        awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
+            deletefiles-$mod deletedirs-$mod \
+            | sort -u > updatetimestamps-$mod
+    fi
+
+    # Find files on the server which are missing on the client
+    sort localfiles-$mod localfiles-$mod allfiles-$mod \
+        | uniq -u > missingfiles-$mod
+
+    # Find dirs on the server which are missing on the client
+    sort localdirs-$mod localdirs-$mod alldirs-$mod \
+        | uniq -u > missingdirs-$mod
+
+    # Find files which have changed size
+    sort allfilesizes-$mod localfilesizes-$mod \
+        | uniq -u | awk -F '\t' '{print $1}' \
+        | uniq -d > updatedfiles-$mod
+
+    # Extract and verify checksums
+    awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"  $mdir/\" \$2}" $fl > checksums-$mod
+    pushd $DESTD > /dev/null 2>&1
+    sha1sum --check --quiet $tempd/checksums-$mod 2> /dev/null \
+        | grep -i 'failed$' \
+        | awk -F: '{print $1}' > $tempd/checksumfailed-$mod
+    popd > /dev/null 2>&1
+}
+
 process_remote_file_list () {
     # Extract various file and directory lists from the master file list
     #
@@ -1217,50 +1274,15 @@ process_module () {
         fi
 
         # Find files on the client which don't exist on the server
-        sort allfiles-$module allfiles-$module localfiles-$module \
-            | uniq -u  > deletefiles-$module
-        remove_filelists_from_file deletefiles-$module $moduledir
+        process_local_file_list $module $moduledir
+
+        # Update the master lists
         cat deletefiles-$module >> master-deletefiles
-
-        # Find dirs on the client which don't exist on the server
-        sort alldirs-$module alldirs-$module localdirs-$module \
-            | uniq -u > deletedirs-$module
         cat deletedirs-$module >> master-deletedirs
-
-        # Extract dirnames of every file and dir in the delete lists, and all of their parents.
-        if [[ -n $updatealldirtimes ]]; then
-            echo $moduledir > updatetimestamps-$module
-            cat alldirs-$module >> updatetimestamps-$module
-        else
-            awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
-                deletefiles-$module deletedirs-$module \
-                | sort -u > updatetimestamps-$module
-        fi
         cat updatetimestamps-$module >> master-updatetimestamps
-
-        # Find files on the server which are missing on the client
-        sort localfiles-$module localfiles-$module allfiles-$module \
-            | uniq -u > missingfiles-$module
         cat missingfiles-$module >> transferlist-$module
-
-        # Find dirs on the server which are missing on the client
-        sort localdirs-$module localdirs-$module alldirs-$module \
-            | uniq -u > missingdirs-$module
         cat missingdirs-$module >> transferlist-$module
-
-        # Find files which have changed size
-        sort allfilesizes-$module localfilesizes-$module \
-            | uniq -u | awk -F '\t' '{print $1}' \
-            | uniq -d > updatedfiles-$module
         cat updatedfiles-$module >> transferlist-$module
-
-        # Extract and verify checksums
-        awk -F '\t' "/^\[Checksums/ {s=1; next} /^$/ {s=0; next} {if (s) print \$1 \"  $moduledir/\" \$2}" $fl > checksums-$module
-        pushd $DESTD > /dev/null 2>&1
-        sha1sum --check --quiet $tempd/checksums-$module 2> /dev/null \
-            | grep -i 'failed$' \
-            | awk -F: '{print $1}' > $tempd/checksumfailed-$module
-        popd > /dev/null 2>&1
         cat checksumfailed-$module >> transferlist-$module
 
         # Count some things we want to use for stats later.
