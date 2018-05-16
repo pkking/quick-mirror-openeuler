@@ -602,6 +602,34 @@ clean_all_transfer_temps () {
     done
 }
 
+clean_stale_rsync_temps () {
+    # Clean up temporaries left over from a previous aborted rsync run.
+    local mod=$1
+
+    db2 Possibly aborted rsync run.  Cleaning up.
+    logit a "cleaning up previous aborted run: $(wc -l < staletmpfiles-$mod) file(s)."
+
+    # Move the files in those tmpdirs a level up if a file with the
+    # same name doesn't exist.  We don't update the file lists because
+    # we want rsync to re-check those files and possibly fix up the
+    # permissions.  The dirs will be cleaned up later.
+    # Note that this _may_ leave a few files around which should not be
+    # there.  They will of course be cleaned up at the next run.
+    # XXX We could do better by comparing the stale files against the
+    #   to-be-fransferred list, but it's probably not worth it.
+    for dir in $(cat staletmpdirs-$mod); do
+        pushd $DESTD/$dir
+        for file in *; do
+            if [[ ! -f ../$file ]]; then
+                logit A Saving previous download $file
+                db3 Saving previous download: $file
+                mv $file ..
+            fi
+        done
+        popd
+    done
+}
+
 fetch_file_lists () {
     # Download the file list for each configred module
     # Will set the global variable "checksums" containing the checksum of the
@@ -1177,29 +1205,7 @@ process_module () {
         fi
 
         if [[ -s staletmpdirs-$module ]]; then
-            db2 Possibly aborted rsync run.  Cleaning up.
-            logit a "cleaning up previous aborted run: $(wc -l < staletmpfiles-$module) file(s)."
-
-            # Move the files in those tmpdirs a level up if a file with the
-            # same name doesn't exist.  We don't update the file lists because
-            # we want rsync to re-check those files and possibly fix up the
-            # permissions.  The dirs will be cleaned up later.
-            # Note that this _may_ leave a few files around which should not be
-            # there.  They will of course be cleaned up at the next run.
-            # XXX We could do better by comparing the stale files against the
-            #   to-be-fransferred list, but it's probably not worth it.
-            for dir in $(cat staletmpdirs-$module); do
-                pushd $DESTD/$dir
-                for file in *; do
-                    if [[ ! -f ../$file ]]; then
-                        logit A Saving previous download $file
-                        db3 Saving previous download: $file
-                        mv $file ..
-                    fi
-                done
-                popd
-            done
-        logit l Generating file list end: $module
+            clean_stale_rsync_temps $module
         fi
 
         # Find files on the client which don't exist on the server
