@@ -92,6 +92,29 @@ dirs_contents_identical () {
     # Cat those files for verbose tests
 }
 
+dirs_identical () {
+    # Are two trees completely identical, including directory timestamps?
+    local d1=$1
+    local d2=$2
+
+    local c1=$od/contents1
+    local c2=$od/contents2
+
+    # Note that rsync <= 3.0.9 won't copy subsecond timestamps
+    local rsyncver=$(rsync --version | head -1 | awk '{print $3}')
+    local -a splitver; splitver=(${(s/./)rsyncver})
+
+    if (( splitver[1] >= 3 && splitver[2] >= 1 )); then
+        find $d1 -printf '%T@\t%m\t%P\n' |sort -k3 > $c1
+        find $d2 -printf '%T@\t%m\t%P\n' |sort -k3 > $c2
+    else
+        find $d1 -printf '%Ts\t%m\t%P\n' |sort -k3 > $c1
+        find $d2 -printf '%Ts\t%m\t%P\n' |sort -k3 > $c2
+    fi
+
+    diff -u $c1 $c2 > $so 2>$se
+}
+
 files_contents_identical () {
     local f1=$1
     local f2=$2
