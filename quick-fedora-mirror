@@ -1027,6 +1027,33 @@ process_file_list_diff () {
     logit l "Generating database diff end: $mod"
 }
 
+generate_local_file_list () {
+    # Generate lists of what the client has.
+    local mod=$1
+    local mdir=$2
+
+    db3 Generating local file/dir list
+    logit l "Generating local file list start: $mod"
+
+    # Traverse the filesystem only once
+    pushd $DESTD
+    find $mdir/* -printf '%y\t%p\t%s\n' > $tempd/localfulllist-$mod
+    popd
+
+    # Now extract file and dir lists from that
+    awk -F '\t' '{if ($1 == "d") {print $2}}' < localfulllist-$mod > localdirs-$mod
+    awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2}}' < localfulllist-$mod > localfiles-$mod
+    awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2 "\t" $3}}' < localfulllist-$mod > localfilesizes-$mod
+
+    # Look for stray .~tmp~ dirs
+    if [[ -z $NORSYNCRECOVERY ]]; then
+        grep '\.~tmp~' localdirs-$mod > staletmpdirs-$mod
+        grep '\.~tmp~' localfiles-$mod > staletmpfiles-$mod
+    fi
+
+    logit l "Generating local file list end: $mod"
+}
+
 process_remote_file_list () {
     # Extract various file and directory lists from the master file list
     #
@@ -1183,26 +1210,7 @@ process_module () {
         process_file_list_diff $fl $module $moduledir
         cat changedpaths-$module >> transferlist-$module
 
-        # XXX Hoist this out to a separate function
-        # process_local_file_list $module $moduledir
-        db3 Generating local file/dir list
-        logit l Generating file list start: $module
-
-        # Traverse the filesystem only once
-        pushd $DESTD
-        find $moduledir/* -printf '%y\t%p\t%s\n' > $tempd/localfulllist-$module
-        popd
-
-        # Now extract file and dir lists from that
-        awk -F '\t' '{if ($1 == "d") {print $2}}' < localfulllist-$module > localdirs-$module
-        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2}}' < localfulllist-$module > localfiles-$module
-        awk -F '\t' '{if ($1 == "f" || $1 == "l") {print $2 "\t" $3}}' < localfulllist-$module > localfilesizes-$module
-
-        # Look for stray .~tmp~ dirs
-        if [[ -z $NORSYNCRECOVERY ]]; then
-            grep '\.~tmp~' localdirs-$module > staletmpdirs-$module
-            grep '\.~tmp~' localfiles-$module > staletmpfiles-$module
-        fi
+        generate_local_file_list $module $moduledir
 
         if [[ -s staletmpdirs-$module ]]; then
             clean_stale_rsync_temps $module
