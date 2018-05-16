@@ -1517,7 +1517,7 @@ else
     db2 No stale files to delete.
 fi
 
-if [[ -n $KEEPDIRTIMES && -s master-updatetimestamps ]]; then
+if [[ ( -n $KEEPDIRTIMES || -n $updatealldirtimes ) && -s master-updatetimestamps ]]; then
     extra=()
     if [[ -n $rsyncdryrun ]]; then
         extra+=(-n)
