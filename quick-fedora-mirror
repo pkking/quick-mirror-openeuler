@@ -440,6 +440,7 @@ parse_args () {
                 ;;
             --dir-times)
                 updatealldirtimes=1
+                alwayscheck=1
                 ;;
             --refresh)
                 skipdelete=1
@@ -1214,13 +1215,14 @@ process_module () {
 
         # Extract dirnames of every file and dir in the delete lists, and all of their parents.
         if [[ -n $updatealldirtimes ]]; then
-            cat alldirs-$module >> master-updatetimestamps
+            echo $moduledir > updatetimestamps-$module
+            cat alldirs-$module >> updatetimestamps-$module
         else
             awk '{dn($0)} function dn(p) { while (sub(/\/[^\/]*\]?$/, "", p)) print p }' \
                 deletefiles-$module deletedirs-$module \
                 | sort -u > updatetimestamps-$module
-            cat updatetimestamps-$module >> master-updatetimestamps
         fi
+        cat updatetimestamps-$module >> master-updatetimestamps
 
         # Find files on the server which are missing on the client
         sort localfiles-$module localfiles-$module allfiles-$module \
