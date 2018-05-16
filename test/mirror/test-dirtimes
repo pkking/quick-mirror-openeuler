@@ -90,6 +90,45 @@ test_dirtimes_4 () {
     assertTrue 'All timestamps should be identical.' "dirs_identical $td1 $destdir/module-a"
 }
 
+test_dirtimes_5 () {
+    # Same as #4, but only delete one file.
+
+    assertTrue 'Initial copy did not succeed.' \
+        "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+
+    sleep_next_second
+
+    rm $td1/dir1/dir1/dir1/dir1/dir1/dir1/file1
+    $cf -d $td1 -f $td1/fullfilelist -t $td1/fullfiletimelist-module-a
+
+    # This seems to be needed because rsync may decide not to update a
+    # timestamp under some conditions.  I think it relies on some combination
+    # of the remote timestamp, the local on-disk timestamp, and the transfer
+    # time. If these are all within a second then it doesn't seem to update
+    # things.
+    sleep_next_second
+
+    assertTrue 'Second copy did not succeed.' \
+        "$qfm --no-paranoia -c $testdir/dirtimes.conf &> $so"
+
+    assertTrue 'Third rsync pass was not made (1)' "file_contains $so \"Updating timestamps on 7 dirs\""
+    assertTrue 'Third rsync pass was not made (2)' "file_contains $so \"do_rsync.*master-updatetimestamps\""
+    assertTrue 'All timestamps should be identical.' "dirs_identical $td1 $destdir/module-a"
+}
+
+test_dirtimes_6 () {
+    # Test the --dir-times option
+
+    assertTrue 'Initial copy did not succeed.' \
+        "$qfm --no-paranoia -c $testdir/simple.conf &> $so"
+
+    # A second copy, asking for a directory time update
+    assertTrue 'Second copy did not succeed.' \
+        "$qfm --dir-times --no-paranoia -c $testdir/simple.conf &> $so"
+
+    assertTrue 'Full timestamp update pass was not made.' "file_contains $so \"Updating timestamps on 127 dirs\""
+}
+
 source ${0:h}/common-end
 
 # load shunit2
