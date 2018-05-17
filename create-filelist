@@ -88,6 +88,8 @@ def recursedir(path='.', skip=[], alwaysskip=['.~tmp~'], in_restricted=False):
             continue
         if dentry.name in alwaysskip:
             continue
+        if dentry.name.startswith('.nfs'):
+            continue
 
         # Skip things which are not at least group readable
         # Symlinks are followed here so that clients won't see dangling
