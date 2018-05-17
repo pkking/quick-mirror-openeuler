@@ -54,6 +54,35 @@ test_skip_files () {
 
 }
 
+test_skip_rsynctmp () {
+    # Make sure that rsync .~tmp~ files are skipped
+
+    for i in $td/dir*; do
+        mkdir $i/.~tmp~
+        touch $i/.~tmp~/foo
+    done
+
+    $cf -d $td -t $tl
+
+    assertFalse 'create_filelist must always skip rsync temporaries' "file_contains $tl \"\.~tmp~\""
+    assertFalse 'create_filelist must skip files inside of rsync tempdirs' "file_contains $tl foo"
+}
+
+test_skip_nfs () {
+    # Make sure that files beginning with ".nfs" are skipped
+
+    for i in $td $td/dir*; do
+        touch $i/.nfs$RANDOM$RANDOM$RANDOM
+        touch $i/foo-1.2.3.nfs-$RANDOM.foo
+    done
+
+    $cf -d $td -t $tl
+
+    assertFalse 'create_filelist must skip .nfs files (1)' "file_contains $tl \"\t\.nfs\""
+    assertFalse 'create_filelist must skip .nfs files (2)' "file_contains $tl \"/\.nfs\""
+    assertTrue 'create_filelist should not skip filenames merely containing ".nfs"' "file_contains $tl foo"
+}
+
 test_file_size_update () {
     # Check that an updated file gets an updated size
     $cf -d $td -t $tl
