@@ -1167,6 +1167,17 @@ process_remote_file_list () {
     awk -F '\t' '{print $1}' newfilesizes-$module > newfiles-$module; retcheck $? awk
 }
 
+update_master_file_lists () {
+    # Simply append various per-module lists to the master lists
+    cat deletefiles-$module >> master-deletefiles
+    cat deletedirs-$module >> master-deletedirs
+    cat updatetimestamps-$module >> master-updatetimestamps
+    cat missingfiles-$module >> transferlist-$module
+    cat missingdirs-$module >> transferlist-$module
+    cat updatedfiles-$module >> transferlist-$module
+    cat checksumfailed-$module >> transferlist-$module
+}
+
 remove_filelists_from_file () {
     # Remove the file from $FILELIST and anything given by $EXTRAFILES.
     # Takes:
@@ -1219,7 +1230,9 @@ process_module () {
     local moduledir=$MODULEMAPPING[$module]
 
     local fl=${FILELIST/'$mdir'/$moduledir}
-    local linecount linecount2
+    local cntallserverfiles cntallserverdirs cntnewserverfiles cntnewserverdirs
+    local cntchangedpaths cntlocalfiles cntlocaldirs cntextrafiles cntextradirsi
+    local cntmissingfiles cntmissingdirs cntsizechanged cntupdatetimestamps cntchecksumfailed
     local extra
 
     if [[ -z $alwayscheck && \
@@ -1245,12 +1258,12 @@ process_module () {
 
     process_remote_file_list $fl $module $moduledir
 
-    local cntallserverfiles=$(wc -l < allfiles-$module)
-    local cntallserverdirs=$(wc -l < alldirs-$module)
+    cntallserverfiles=$(wc -l < allfiles-$module)
+    cntallserverdirs=$(wc -l < alldirs-$module)
     db2f "Total on server:       %7d files, %4d dirs.\n" $cntallserverfiles $cntallserverdirs
 
-    local cntnewserverfiles=$(wc -l < newfiles-$module)
-    local cntnewserverdirs=$(wc -l < newdirs-$module)
+    cntnewserverfiles=$(wc -l < newfiles-$module)
+    cntnewserverdirs=$(wc -l < newdirs-$module)
     db2f "New on server:         %7d files, %4d dirs.\n" $cntnewserverfiles $cntnewserverdirs
 
     # Add extra files to the transfer list
@@ -1275,33 +1288,19 @@ process_module () {
 
         # Find files on the client which don't exist on the server
         process_local_file_list $module $moduledir
-
-        # Update the master lists
-        cat deletefiles-$module >> master-deletefiles
-        cat deletedirs-$module >> master-deletedirs
-        cat updatetimestamps-$module >> master-updatetimestamps
-        cat missingfiles-$module >> transferlist-$module
-        cat missingdirs-$module >> transferlist-$module
-        cat updatedfiles-$module >> transferlist-$module
-        cat checksumfailed-$module >> transferlist-$module
+        update_master_file_lists $module
 
         # Count some things we want to use for stats later.
-        local cntchangedpaths=$(wc -l < changedpaths-$module)
-
-        local cntlocalfiles=$(wc -l < localfiles-$module)
-        local cntlocaldirs=$(wc -l < localdirs-$module)
-
-        local cntextrafiles=$(wc -l < deletefiles-$module)
-        local cntextradirs=$(wc -l < deletedirs-$module)
-
-        local cntmissingfiles=$(wc -l < missingfiles-$module)
-        local cntmissingdirs=$(wc -l < missingdirs-$module)
-
-        local cntsizechanged=$(wc -l < updatedfiles-$module)
-
-        local cntupdatetimestamps=$(wc -l < updatetimestamps-$module)
-
-        local cntchecksumfailed=$(wc -l < checksumfailed-$module)
+        cntchangedpaths=$(wc -l < changedpaths-$module)
+        cntlocalfiles=$(wc -l < localfiles-$module)
+        cntlocaldirs=$(wc -l < localdirs-$module)
+        cntextrafiles=$(wc -l < deletefiles-$module)
+        cntextradirs=$(wc -l < deletedirs-$module)
+        cntmissingfiles=$(wc -l < missingfiles-$module)
+        cntmissingdirs=$(wc -l < missingdirs-$module)
+        cntsizechanged=$(wc -l < updatedfiles-$module)
+        cntupdatetimestamps=$(wc -l < updatetimestamps-$module)
+        cntchecksumfailed=$(wc -l < checksumfailed-$module)
 
         db2f "Total on client:       %7d files, %4d dirs.\n" $cntlocalfiles $cntlocaldirs
         db2f "Not present on server: %7d files, %4d dirs.\n" $cntextrafiles $cntextradirs
