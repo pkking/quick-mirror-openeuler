@@ -9,3 +9,6 @@ File list filtering
 Aborted rsync run cleanup.
   No good way to kill rsync in the middle of a transfer.  Maybe fake this?
   Maybe chmod 000 some directory in the tree without updating the file list?
+
+Some checks on the format of file list generation across multiple python
+versions.
