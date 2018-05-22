@@ -14,6 +14,9 @@ export LANG=C
 # ZSHISM? newline for IFS.
 IFS=$'\n'
 
+# Declare globals
+typeset -A tcounts   # Transfer counts
+
 # Do this very early
 starttime=$(date +%s)
 
@@ -1025,6 +1028,47 @@ process_file_list_diff () {
     filter changedpaths-$mod
 
     logit l "Generating database diff end: $mod"
+}
+
+compute_file_list_stats () {
+    # Calculate and log counts of the various generated lists
+    local mod=$1
+    local -a stats
+    stats=(allfiles alldirs newfiles newdirs changedpaths localfiles \
+        localdirs deletefiles deletedirs missingfiles missingdirs \
+        updatedfiles updatetimestamps checksumfailed)
+
+    for i in stats; do
+        counts[$i]=0
+        [[ -f $i-$mod ]] && counts[$i]=$(wc -l < $i-$mod)
+    done
+
+    counts[totaltransfer]=$(wc -l transferlist-$mod)
+
+    # Until the rest of the code is fixed up
+    counts[extrafiles]=$counts[deletefiles]
+    counts[extradirs]=$counts[deletedirs]
+    counts[sizechanged]=$counts[updatedfiles]
+    counts[allserverfiles]=$counts[allfiles]
+    counts[allserverdirs]=$counts[alldirs]
+    counts[newserverfiles]=$counts[newfiles]
+    counts[newserverdirs]=$counts[newdirs]
+
+    # Previously these two were printed before generating the local file lists
+    db2f "Total on server:       %7d files, %4d dirs.\n" $cntallserverfiles $cntallserverdirs
+    db2f "New on server:         %7d files, %4d dirs.\n" $cntnewserverfiles $cntnewserverdirs
+
+    db2f "Total on client:       %7d files, %4d dirs.\n" $counts[localfiles $counts[localdirs]
+    db2f "Not present on server: %7d files, %4d dirs.\n" $counts[extrafiles] $counts[extradirs]
+    db2f "Missing on client:     %7d files, %4d dirs.\n" $counts[missingfiles] $counts[missingdirs]
+    db2f "Size Changed:          %7d files.\n" $counts[sizechanged]
+    db2f "Timestamps to restore: %7d files.\n" $counts[updatetimestamps]
+    db2f "Checksum Failed:       %7d files.\n" $counts[checksumfailed]
+    db2f "Filelist changes:      %7d paths.\n" $counts[changedpaths]
+    db2f "Total to transfer:     %7d paths.\n" $counts[totaltransfer]
+
+    logit L "Counts for $mod: Svr:$counts[allserverfiles]/$counts[allserverdirs] Loc:$counts[localfiles]/$counts[localdirs] Diff:$counts[changedpaths] New:$counts[newserverfiles]/$counts[newserverdirs] Xtra:$counts[extrafiles]/$counts[extradirs] Miss:$counts[missingfiles]/$counts[missingdirs] Size:$counts[sizechanged] Csum:$counts[checksumfailed] Dtim:$counts[updatetimestamps]"
+
 }
 
 generate_local_file_list () {
