@@ -792,7 +792,10 @@ checkin_upload_payload () {
 
     logit M "Making xmlrpc call for $module"
     curlopts=(--silent)
+    curl --help | grep -q http1\.1
+    (( ? == 0 )) && curlopts+=(--http1.1)
     (( VERBOSE >= 4 )) && curlopts=(--verbose)
+    db3 "$CURL $curlopts -H \"Expect:\" -H \"Content-Type: text/xml\" --data @$mx $MIRRORMANAGER"
     $CURL $curlopts -H "Expect:" -H "Content-Type: text/xml" --data @$mx $MIRRORMANAGER > curl.out
     curlret=$?
     if [[ $curlret -ne 0 ]]; then
