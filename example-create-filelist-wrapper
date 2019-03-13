@@ -25,6 +25,7 @@ CREATE=/usr/local/bin/create-filelist
 # context.
 FILELIST=fullfilelist
 TIMELIST='fullfiletimelist-$mod'
+IMAGELIST='imagelist-$mod'
 
 usage () {
     echo
@@ -107,10 +108,12 @@ cd $tmpd
     for mod in ${MODS[@]}; do
         currentfl=$TOPD/$mod/${FILELIST/'$mod'/$mod}
         currenttl=$TOPD/$mod/${TIMELIST/'$mod'/$mod}
+        currentil=$TOPD/$mod/${IMAGELIST/'$mod'/$mod}
         flname=$(basename $currentfl)
         tlname=$(basename $currenttl)
+        ilname=$(basename $currentil)
 
-        $CREATE -c -s -d $TOPD/$mod -f $flname -t $tlname
+        $CREATE -c -s -d $TOPD/$mod -f $flname -t $tlname -i $ilname
 
         if [[ $? -ne 0 ]]; then
             (>&2 echo "File list generator failed?")
@@ -125,6 +128,9 @@ cd $tmpd
         if [[ -f $currenttl ]] && diff -q $currenttl $tlname > /dev/null; then
             rm -f $tlname
         fi
+        if [[ -f $currentil ]] && diff -q $currentil $ilname > /dev/null; then
+            rm -f $ilname
+        fi
     done
 
     # Now we have the new file lists but in a temporary directory which
@@ -133,10 +139,13 @@ cd $tmpd
     for mod in ${MODS[@]}; do
         currentfl=$TOPD/$mod/${FILELIST/'$mod'/$mod}
         currenttl=$TOPD/$mod/${TIMELIST/'$mod'/$mod}
+        currentil=$TOPD/$mod/${IMAGELIST/'$mod'/$mod}
         flname=$(basename $currentfl)
         fldir=$(dirname $currentfl)
         tlname=$(basename $currenttl)
         tldir=$(dirname $currenttl)
+        ilname=$(basename $currentil)
+        ildir=$(dirname $currentil)
 
         if [[ -f $flname ]]; then
             tmpf=$(mktemp -p $fldir $flname.XXXXXXXXXX)
@@ -149,6 +158,12 @@ cd $tmpd
             cp -p $tlname $tmpf
             chmod 644 $tmpf
             mv $tmpf $currenttl
+        fi
+        if [[ -f $ilname ]]; then
+            tmpf=$(mktemp -p $ildir $ilname.XXXXXXXXXX)
+            cp -p $ilname $tmpf
+            chmod 644 $tmpf
+            mv $tmpf $currentil
         fi
     done
 
