@@ -112,6 +112,11 @@ cd $tmpd
 
         $CREATE -c -s -d $TOPD/$mod -f $flname -t $tlname
 
+        if [[ $? -ne 0 ]]; then
+            (>&2 echo "File list generator failed?")
+            exit 1
+        fi
+
         # If a file list exsts and doesn't differ from what we just generated,
         # delete the latter.
         if [[ -f $currentfl ]] && diff -q $currentfl $flname > /dev/null; then
