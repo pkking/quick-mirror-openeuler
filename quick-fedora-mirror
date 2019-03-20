@@ -1298,6 +1298,7 @@ process_module () {
     # Make sure the list is complete.
     tail -2 $fl | grep -q '^\[End\]$'
     if (( ? != 0 )); then
+        logit e "Invalid file list; skipping $module"
         (>&2 echo "No end marker.  Corrupted file list?"
         echo Skipping $module.)
         return
