@@ -17,10 +17,9 @@ to be copied as hardlinks instead of being downloaded multiple times.
 Client
 ======
 
-The client is ``quick-fedora-mirror``.  It is currently written in zsh but
-should be portable to bash.  (I needed associative arrays and haven't learned
-to do them in bash.)  It needs no external tools besides ``rsync``, ``awk``,
-and the usual core utilities.
+The client is ``quick-fedora-mirror``.  It is written in zsh and uses features
+which aren't really portable to bash  bash.  It needs no external tools besides
+``rsync``, ``awk``, and the usual core utilities.
 
 A config file is required (unless you edit the script); see the sample file in
 ``quick-fedora-mirror.conf.dist``.  The destination directory and location of
