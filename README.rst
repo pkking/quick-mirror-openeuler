@@ -18,7 +18,7 @@ Client
 ======
 
 The client is ``quick-fedora-mirror``.  It is written in zsh and uses features
-which aren't really portable to bash  bash.  It needs no external tools besides
+which aren't really portable to bash.  It needs no external tools besides
 ``rsync``, ``awk``, and the usual core utilities.
 
 A config file is required (unless you edit the script); see the sample file in
