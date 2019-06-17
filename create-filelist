@@ -1,5 +1,4 @@
-#!/usr/bin/python
-from __future__ import print_function
+#!/usr/bin/python3
 
 # A simple script to generate a file list in a format easily consumable by a
 # shell script.
