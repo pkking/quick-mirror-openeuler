@@ -89,6 +89,27 @@ lock () {
     return 1
 }
 
+save_state () {
+    # Doing an mv here actually undoes the locking.  Could use cp instead.
+    # Currently the unlocking is a good thing because it allows the checkin to
+    # proceed without the next run waiting.  But this should be audited.
+    if [[ -z $skiptimestamp ]]; then
+        db2 Saving mirror time to $TIMEFILE
+        if [[ -e $TIMEFILE ]]; then
+            mv $TIMEFILE $TIMEFILE.prev
+        fi
+        echo LASTTIME=$starttime > $TIMEFILE
+
+        if (( ? != 0 )); then
+            (>&2 echo Problem saving timestamp file $TIMEFILE)
+            logit E "Failed to update timestamp file"
+            exit 1
+        fi
+    else
+        db2 Skipping timestamp save.
+    fi
+}
+
 finish () {
     # Finish up.
     #
@@ -1611,24 +1632,8 @@ if [[ ( -n $KEEPDIRTIMES || -n $updatealldirtimes ) && -s master-updatetimestamp
     do_rsync $REMOTE/$MASTERMODULE/ $DESTD master-updatetimestamps extra
 fi
 
-# State saving
-# XXX Doing the mv here actually undoes the locking.  Try to think of a better
-# way to do this.
-# ============
-if [[ -z $skiptimestamp ]]; then
-    db2 Saving mirror time to $TIMEFILE
-    if [[ -e $TIMEFILE ]]; then
-        mv $TIMEFILE $TIMEFILE.prev
-    fi
-    echo LASTTIME=$starttime > $TIMEFILE
-
-    if (( ? != 0 )); then
-        (>&2 echo Problem saving timestamp file $TIMEFILE)
-        exit 1
-    fi
-else
-    db2 Skipping timestamp save.
-fi
+# We've completed a run, so save the timestamp
+save_state
 
 # Mirrormanager Checkin and Callout
 # =================================
