@@ -110,6 +110,28 @@ save_state () {
     fi
 }
 
+append_state () {
+    # Think about how to save extra state in the timestamp file or some
+    # associated file.  Should we even do this?
+    # Should this be saved to a separate status file instead?
+
+
+    # Cannot rewrite the file or else the locking breaks.  Updating it should
+    # be OK.
+    # Save things in a format that can be sourced (VAR=value).
+    # Repeated uses (VAR=value2) are OK and overwrite the previous value when the file is sourced.
+
+    # What would use this?  A separate status program or some other monitor?
+    #
+    # Save data about the current transfer:
+    # The current point in the process (
+    # Counts
+    # The current tempdir
+    # Important transfer list files
+    # The current rsync output file (for tailing and counting) since this is random.
+
+}
+
 finish () {
     # Finish up.
     #
