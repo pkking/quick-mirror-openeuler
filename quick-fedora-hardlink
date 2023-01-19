@@ -162,12 +162,16 @@ def process_one_filelist(filelist, module, candidates, check_ctime=True, filtere
             filename = os.path.basename(pathname)
 
             if check_ctime:
-                key = filename + size + ctime
+                key = filename + ctime
             else:
-                key = filename + size
+                key = filename
 
             # Not using os.path.join because it's slow
             p = module + '/' + pathname
+            # bcs 22.03 sp1 rebuild pkgs and rename it
+            # so we treat two pkg same if name-evr-arch are same
+            if "oe2203sp1" in key:
+                key = key.replace("oe2203sp1", "oe2203")
             if key in candidates:
                 candidates[key].append(p)
             else:
@@ -209,6 +213,10 @@ def files_differ(f1, f2):
     The rest of filecmp.py isn't useful, and results in too many stat calls for
     our purposes.
     """
+    # some pkgs in openEuler with same name but different size
+    # simplely treat them are the same
+    if '.rpm' in f1 and '.rpm' in f2:
+        return False
     bufsize = 8 * 1024
     if g.opts.debug:
         uprint('Compare {}, {}'.format(f1, f2), True)
